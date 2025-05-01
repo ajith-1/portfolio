@@ -40,7 +40,7 @@ const Navbar = () => {
               to={item}
               spy
               smooth
-              offset={-70}
+              offset={-40}
               duration={500}
               onClick={handleDrawerToggle}
               style={{ width: '100%', textDecoration: 'none' }}
@@ -93,7 +93,7 @@ const Navbar = () => {
                   to={item}
                   spy={true}
                   smooth={true}
-                  offset={-70}
+                  offset={-40}
                   duration={500}
                   activeClass="active"
                   style={{ textDecoration: 'none' }}
