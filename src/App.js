@@ -1,11 +1,15 @@
 import React from 'react';
 import './style.css';
-import Portfolio from './components/Portfolio';
+import Tracker from './Tracker';
+// import Clear from './Clear';
+// import Portfolio from './components/Portfolio';
 
 function App() {
   return (
     <>
-    <Portfolio/>
+    <Tracker/>
+    {/* <Portfolio/> */}
+    {/* <Clear/> */}
     </>
   );
 }
