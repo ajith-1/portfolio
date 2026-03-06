@@ -1,1269 +1,937 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ThemeProvider, createTheme, CssBaseline, Box, Typography, Drawer, List,
-  ListItem, ListItemIcon, ListItemText, AppBar, Toolbar, IconButton, Chip,
-  Avatar, Divider, Card, CardContent, Button, TextField, Select, MenuItem,
-  FormControl, InputLabel, Stepper, Step, StepLabel, StepContent,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab, LinearProgress,
-  Grid, InputAdornment, Alert, Snackbar, CircularProgress, Tooltip,
-} from "@mui/material";
-import {
-  Package, Truck, Globe, Home, CreditCard, Search, Plus, MapPin,
-  CheckCircle, BarChart3, Users, Building2, FileText, Plane, Ship,
-  ArrowRight, DollarSign, Download, RefreshCw, Navigation, Shield,
-  Database, Wifi, WifiOff, Save, X, Check, Zap,
-} from "lucide-react";
 
-const theme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: { main: "#00D4FF", contrastText: "#000" },
-    secondary: { main: "#FF6B35", contrastText: "#fff" },
-    success: { main: "#00E676" },
-    warning: { main: "#FFD600" },
-    error: { main: "#FF1744" },
-    background: { default: "#040B16", paper: "#08152A" },
-    text: { primary: "#E2F0FA", secondary: "#7A9BB5" },
+// ─── CONFIG ────────────────────────────────────────────────────────────────
+const SHEET_ID = "1XKsYofCUfwoCXFWjKlVKH0uug1HIAf9gGGwpFYbQPO0";
+const SHEET_NAMES = { intl: "International", courier: "AirCourier" };
+
+// Google Sheets public CSV export
+const csvUrl = (sheetName) =>
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+
+const ENTITIES = ["OET-FF", "OET-RMZ", "OCT-GF", "OCT-BIC"];
+const MODES_INTL = ["Air", "Sea", "Road", "Rail"];
+const MODES_COURIER = ["Air Courier", "Express", "Standard"];
+const INCO_TERMS = ["EXW", "FOB", "CIF", "DDP", "DAP", "FCA", "CPT", "CIP"];
+const CURRENCIES = ["USD", "EUR", "GBP", "INR", "JPY", "CNY", "AUD", "SGD"];
+const PAYMENT_STATUS = ["Pending", "Paid", "Partial", "On Hold"];
+
+// ─── STYLES ─────────────────────────────────────────────────────────────────
+const theme = {
+  primary: "#1B4F72",
+  primaryLight: "#2980B9",
+  accent: "#F39C12",
+  success: "#27AE60",
+  danger: "#E74C3C",
+  bg: "#F4F6F9",
+  surface: "#FFFFFF",
+  surfaceAlt: "#EBF2FA",
+  border: "#D5E8F5",
+  text: "#1A2530",
+  textSub: "#5D7A8C",
+  textLight: "#8FA8BA",
+};
+
+const styles = {
+  app: {
+    minHeight: "100vh",
+    background: theme.bg,
+    fontFamily: "'IBM Plex Sans', 'Segoe UI', sans-serif",
+    color: theme.text,
   },
-  typography: {
-    fontFamily: "'Space Grotesk', sans-serif",
-    h4: { fontFamily: "'Orbitron', monospace", fontWeight: 700 },
-    h5: { fontFamily: "'Orbitron', monospace", fontWeight: 600 },
-    h6: { fontFamily: "'Orbitron', monospace", fontWeight: 600 },
+  sidebar: {
+    width: 240,
+    background: theme.primary,
+    minHeight: "100vh",
+    position: "fixed",
+    left: 0,
+    top: 0,
+    zIndex: 100,
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "4px 0 24px rgba(27,79,114,0.18)",
   },
-  components: {
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          background: "linear-gradient(135deg,#08152A 0%,#0C1E38 100%)",
-          border: "1px solid rgba(0,212,255,0.1)",
-          borderRadius: 14,
-        },
-      },
-    },
-    MuiButton: {
-      styleOverrides: {
-        root: { borderRadius: 9, textTransform: "none", fontWeight: 700 },
-        containedPrimary: {
-          background: "linear-gradient(135deg,#00D4FF,#0088BB)",
-          "&:hover": { background: "linear-gradient(135deg,#33DDFF,#00A8E0)" },
-        },
-      },
-    },
-    MuiTextField: {
-      styleOverrides: {
-        root: {
-          "& .MuiOutlinedInput-root": {
-            borderRadius: 9,
-            "& fieldset": { borderColor: "rgba(0,212,255,0.18)" },
-            "&:hover fieldset": { borderColor: "rgba(0,212,255,0.45)" },
-            "&.Mui-focused fieldset": { borderColor: "#00D4FF" },
-          },
-        },
-      },
-    },
-    MuiChip: { styleOverrides: { root: { borderRadius: 7, fontWeight: 700 } } },
-    MuiDialog: {
-      styleOverrides: {
-        paper: {
-          background: "linear-gradient(135deg,#08152A,#0C1E38)",
-          border: "1px solid rgba(0,212,255,0.15)",
-          borderRadius: 16,
-        },
-      },
-    },
+  main: {
+    marginLeft: 240,
+    padding: "32px 36px",
+    minHeight: "100vh",
   },
+  card: {
+    background: theme.surface,
+    borderRadius: 12,
+    boxShadow: "0 2px 16px rgba(27,79,114,0.08)",
+    border: `1px solid ${theme.border}`,
+    padding: 24,
+    marginBottom: 24,
+  },
+  input: {
+    width: "100%",
+    padding: "9px 13px",
+    border: `1.5px solid ${theme.border}`,
+    borderRadius: 8,
+    fontSize: 13,
+    color: theme.text,
+    background: "#fff",
+    outline: "none",
+    transition: "border 0.2s",
+    boxSizing: "border-box",
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: theme.textSub,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    marginBottom: 4,
+    display: "block",
+  },
+  btn: {
+    padding: "10px 22px",
+    borderRadius: 8,
+    border: "none",
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+    transition: "all 0.18s",
+    letterSpacing: "0.03em",
+  },
+  btnPrimary: {
+    background: theme.primary,
+    color: "#fff",
+  },
+  btnAccent: {
+    background: theme.accent,
+    color: "#fff",
+  },
+  btnOutline: {
+    background: "transparent",
+    color: theme.primary,
+    border: `1.5px solid ${theme.primary}`,
+  },
+  tag: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "3px 10px",
+    borderRadius: 20,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+  },
+};
+
+// ─── FIELD DEFINITIONS ──────────────────────────────────────────────────────
+const intlFields = [
+  { key: "shipmentId", label: "Shipment ID", type: "text", required: true },
+  { key: "entity", label: "Entity", type: "select", options: ENTITIES, required: true },
+  { key: "userSPOC", label: "User SPOC", type: "text" },
+  { key: "userRequestedDate", label: "User Requested Date", type: "date" },
+  { key: "mode", label: "MODE", type: "select", options: MODES_INTL },
+  { key: "incoTerm", label: "INCO TERM", type: "select", options: INCO_TERMS },
+  { key: "dgNonDg", label: "DG / NON-DG", type: "select", options: ["DG", "NON-DG"] },
+  { key: "rdProgramDetails", label: "R&D Program Details", type: "text" },
+  { key: "supplierPO", label: "Supplier PO", type: "text" },
+  { key: "shipper", label: "SHIPPER", type: "text" },
+  { key: "itemDescription", label: "ITEM DESCRIPTION", type: "textarea" },
+  { key: "hsCode", label: "HS CODE", type: "text" },
+  { key: "originPort", label: "Origin Port", type: "text" },
+  { key: "countryName", label: "Country Name", type: "text" },
+  { key: "commercialInvNo", label: "Commercial INV. NO", type: "text" },
+  { key: "commercialInvDate", label: "Commercial INV DATE", type: "date" },
+  { key: "invoiceValue", label: "INVOICE VALUE", type: "number" },
+  { key: "currency", label: "Currency", type: "select", options: CURRENCIES },
+  { key: "qty", label: "QTY", type: "number" },
+  { key: "qtyType", label: "QTY TYPE", type: "text" },
+  { key: "noOfPackage", label: "No of Package", type: "number" },
+  { key: "ff", label: "FF", type: "text" },
+  { key: "hawbBlNo", label: "HAWB/BL NO", type: "text" },
+  { key: "etd", label: "ETD", type: "date" },
+  { key: "eta", label: "ETA", type: "date" },
+  { key: "pickupDateTarget", label: "Pickup Date Target", type: "date" },
+  { key: "pickupDateActual", label: "Pickup Date Actual", type: "date" },
+  { key: "deliveryDateTarget", label: "Delivery Date Target", type: "date" },
+  { key: "deliveryDateActual", label: "Delivery Date Actual", type: "date" },
+  { key: "tatTarget", label: "TAT Target (days)", type: "computed", readOnly: true },
+  { key: "tatActual", label: "TAT Actual (days)", type: "computed", readOnly: true },
+  { key: "noOfContainers", label: "No. of Containers", type: "number" },
+  { key: "destinationPortCode", label: "Destination Port Code", type: "text" },
+  { key: "boeNumber", label: "BOE NUMBER", type: "text" },
+  { key: "boeDate", label: "BOE DATE", type: "date" },
+  { key: "exRate", label: "EX RATE", type: "number" },
+  { key: "boeFreightInr", label: "BOE FREIGHT INR", type: "number" },
+  { key: "insuranceFc", label: "INSURANCE in (FC)", type: "number" },
+  { key: "taxableValue", label: "Taxable Value", type: "number" },
+  { key: "bcd", label: "BCD", type: "number" },
+  { key: "sws", label: "SWS", type: "number" },
+  { key: "igst", label: "IGST", type: "number" },
+  { key: "penalty", label: "Penalty", type: "number" },
+  { key: "beGrossDuty", label: "BE GROSS Duty", type: "number" },
+  { key: "generalEpcg", label: "General / EPCG", type: "select", options: ["General", "EPCG"] },
+  { key: "epcgLicense", label: "EPCG License", type: "text" },
+  { key: "demurrageCharges", label: "Demurrage Charges", type: "number" },
+  { key: "clearanceTaxInvNoCha", label: "Clearance Tax Invoice No (CHA)", type: "text" },
+  { key: "clearanceCost", label: "Clearance COST", type: "number" },
+  { key: "taxInvNoFf", label: "Tax Invoice No (FF Invoice)", type: "text" },
+  { key: "landingFreightCost", label: "LANDING FREIGHT COST", type: "number" },
+  { key: "logisticsOlaPo", label: "Logistics OLA PO NO", type: "text" },
+  { key: "grn", label: "GRN", type: "text" },
+  { key: "paymentStatus", label: "Payment status", type: "select", options: PAYMENT_STATUS },
+  { key: "utrDetails", label: "UTR Details", type: "text" },
+  { key: "paymentDate", label: "Payment Date", type: "date" },
+  { key: "remarks", label: "REMARKS", type: "textarea" },
+];
+
+const courierFields = [
+  { key: "shipmentId", label: "Shipment ID", type: "text", required: true },
+  { key: "entity", label: "Entity", type: "select", options: ENTITIES, required: true },
+  { key: "userSPOC", label: "User SPOC", type: "text" },
+  { key: "userRequestedDate", label: "User Requested Date", type: "date" },
+  { key: "mode", label: "MODE", type: "select", options: MODES_COURIER },
+  { key: "incoTerm", label: "INCO TERM", type: "select", options: INCO_TERMS },
+  { key: "rdProgramDetails", label: "R&D Program Details", type: "text" },
+  { key: "supplierPO", label: "Supplier PO", type: "text" },
+  { key: "shipper", label: "SHIPPER", type: "text" },
+  { key: "itemDescription", label: "ITEM DESCRIPTION", type: "textarea" },
+  { key: "hsCode", label: "HS CODE", type: "text" },
+  { key: "originPort", label: "Origin Port", type: "text" },
+  { key: "countryName", label: "Country Name", type: "text" },
+  { key: "commercialInvNo", label: "Commercial INV. NO", type: "text" },
+  { key: "commercialInvDate", label: "Commercial INV DATE", type: "date" },
+  { key: "invoiceValue", label: "INVOICE VALUE", type: "number" },
+  { key: "currency", label: "Currency", type: "select", options: CURRENCIES },
+  { key: "qty", label: "QTY", type: "number" },
+  { key: "qtyType", label: "QTY TYPE", type: "text" },
+  { key: "noOfPackage", label: "No of Package", type: "number" },
+  { key: "ff", label: "FF", type: "text" },
+  { key: "hawbBlNo", label: "HAWB/BL NO", type: "text" },
+  { key: "etd", label: "ETD", type: "date" },
+  { key: "eta", label: "ETA", type: "date" },
+  { key: "pickupDateTarget", label: "Pickup Date Target", type: "date" },
+  { key: "pickupDateActual", label: "Pickup Date Actual", type: "date" },
+  { key: "deliveryDateTarget", label: "Delivery Date Target", type: "date" },
+  { key: "deliveryDateActual", label: "Delivery Date Actual", type: "date" },
+  { key: "tatTarget", label: "TAT Target (days)", type: "computed", readOnly: true },
+  { key: "tatActual", label: "TAT Actual (days)", type: "computed", readOnly: true },
+  { key: "destinationPortCode", label: "Destination Port Code", type: "text" },
+  { key: "boeNumber", label: "BOE NUMBER", type: "text" },
+  { key: "boeDate", label: "BOE DATE", type: "date" },
+  { key: "exRate", label: "EX RATE", type: "number" },
+  { key: "beGrossDuty", label: "BE GROSS Duty", type: "number" },
+  { key: "dutyInvoice", label: "Duty Invoice", type: "text" },
+  { key: "clearanceTaxInvNoCha", label: "Clearance Tax Invoice No (CHA)", type: "text" },
+  { key: "clearanceCost", label: "Clearance COST", type: "number" },
+  { key: "taxInvNo", label: "Tax Invoice No", type: "text" },
+  { key: "landingFreightCost", label: "LANDING FREIGHT COST", type: "number" },
+  { key: "utrDetails", label: "UTR Details", type: "text" },
+  { key: "paymentDate", label: "Payment Date", type: "date" },
+  { key: "remarks", label: "REMARKS", type: "textarea" },
+];
+
+// ─── HELPERS ────────────────────────────────────────────────────────────────
+const dateDiffDays = (d1, d2) => {
+  if (!d1 || !d2) return "";
+  const diff = (new Date(d2) - new Date(d1)) / (1000 * 60 * 60 * 24);
+  return isNaN(diff) ? "" : Math.round(diff);
+};
+
+const computeTAT = (data) => ({
+  ...data,
+  tatTarget: dateDiffDays(data.pickupDateTarget, data.deliveryDateTarget),
+  tatActual: dateDiffDays(data.pickupDateActual, data.deliveryDateActual),
+  epcgLicense: data.generalEpcg === "General" ? "-" : data.epcgLicense || "",
 });
 
-// ── GOOGLE SHEETS SERVICE ─────────────────────────────────────────────────────
-class SheetsService {
-  constructor(apiKey, spreadsheetId, accessToken) {
-    this.apiKey = apiKey;
-    this.spreadsheetId = spreadsheetId;
-    this.accessToken = accessToken;
-    this.base = "https://sheets.googleapis.com/v4/spreadsheets";
-  }
+const emptyForm = (fields) =>
+  fields.reduce((acc, f) => ({ ...acc, [f.key]: "" }), {});
 
-  authHeader() {
-    if (this.accessToken) return { Authorization: `Bearer ${this.accessToken}` };
-    return {};
-  }
-
-  async verify() {
-    const url = `${this.base}/${this.spreadsheetId}?key=${this.apiKey}&fields=spreadsheetId,sheets.properties.title`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error?.message || "Cannot access spreadsheet.");
-    }
-    return res.json();
-  }
-
-  async read(sheetName) {
-    const url = `${this.base}/${this.spreadsheetId}/values/${encodeURIComponent(sheetName)}?key=${this.apiKey}`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const rows = data.values || [];
-    if (rows.length < 2) return [];
-    const headers = rows[0];
-    return rows.slice(1).map(row => {
-      const obj = {};
-      headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ""; });
-      return obj;
+// ─── GOOGLE SHEETS INTEGRATION ──────────────────────────────────────────────
+async function appendToSheet(sheetName, rowData, fields) {
+  // Build a row array in field order
+  const values = fields.map((f) => rowData[f.key] ?? "");
+  // Using Google Sheets API via fetch (public append via web app would need App Script)
+  // Here we build a deep-link to pre-fill a Google Form, OR show a direct sheet link
+  // For demo, we'll use the Apps Script web app endpoint pattern
+  const APPS_SCRIPT_URL = ""; // User must deploy Apps Script
+  if (!APPS_SCRIPT_URL) return { success: false, noScript: true };
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({ sheet: sheetName, values }),
+      headers: { "Content-Type": "application/json" },
     });
-  }
-
-  async write(sheetName, headers, rows) {
-    const clearUrl = `${this.base}/${this.spreadsheetId}/values/${encodeURIComponent(sheetName)}:clear?key=${this.apiKey}`;
-    await fetch(clearUrl, { method: "POST", headers: { "Content-Type": "application/json", ...this.authHeader() } });
-    const writeUrl = `${this.base}/${this.spreadsheetId}/values/${encodeURIComponent(sheetName)}?valueInputOption=USER_ENTERED&key=${this.apiKey}`;
-    const res = await fetch(writeUrl, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", ...this.authHeader() },
-      body: JSON.stringify({ values: [headers, ...rows] }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || "Write failed. Check sheet permissions.");
-    }
-    return res.json();
+    return await res.json();
+  } catch (e) {
+    return { success: false, error: e.message };
   }
 }
 
-// ── SCHEMA ───────────────────────────────────────────────────────────────────
-const SHIP_H = ["id","type","originCity","originCountry","originCode","destCity","destCountry","destCode","shipperName","shipperId","receiverName","receiverId","carrierName","carrierId","status","progress","mode","weight","dimensions","value","currency","paymentStatus","paymentAmount","paymentMethod","createdAt","eta","trackingJson","documentsJson"];
-const ENT_H  = ["id","name","type","country","email","phone","address","shipments","revenue","createdAt"];
-const PAY_H  = ["id","shipmentId","amount","currency","status","method","date","entity","notes"];
-
-function s2r(s) {
-  return SHIP_H.map(h => {
-    if (h === "trackingJson")   return JSON.stringify(s.tracking || []);
-    if (h === "documentsJson")  return JSON.stringify(s.documents || []);
-    if (h === "originCity")     return s.origin?.city || "";
-    if (h === "originCountry")  return s.origin?.country || "";
-    if (h === "originCode")     return s.origin?.code || "";
-    if (h === "destCity")       return s.destination?.city || "";
-    if (h === "destCountry")    return s.destination?.country || "";
-    if (h === "destCode")       return s.destination?.code || "";
-    if (h === "shipperName")    return s.shipper?.name || "";
-    if (h === "shipperId")      return s.shipper?.id || "";
-    if (h === "receiverName")   return s.receiver?.name || "";
-    if (h === "receiverId")     return s.receiver?.id || "";
-    if (h === "carrierName")    return s.carrier?.name || "";
-    if (h === "carrierId")      return s.carrier?.id || "";
-    return s[h] !== undefined ? String(s[h]) : "";
-  });
-}
-
-function r2s(r) {
-  return {
-    id: r.id, type: r.type, status: r.status,
-    progress: Number(r.progress) || 0, mode: r.mode,
-    weight: r.weight, dimensions: r.dimensions, value: r.value, currency: r.currency,
-    paymentStatus: r.paymentStatus, paymentAmount: Number(r.paymentAmount) || 0,
-    paymentMethod: r.paymentMethod, createdAt: r.createdAt, eta: r.eta,
-    origin: { city: r.originCity, country: r.originCountry, code: r.originCode },
-    destination: { city: r.destCity, country: r.destCountry, code: r.destCode },
-    shipper:  { name: r.shipperName,  id: r.shipperId  },
-    receiver: { name: r.receiverName, id: r.receiverId },
-    carrier:  { name: r.carrierName,  id: r.carrierId  },
-    tracking:  (() => { try { return JSON.parse(r.trackingJson  || "[]"); } catch { return []; } })(),
-    documents: (() => { try { return JSON.parse(r.documentsJson || "[]"); } catch { return []; } })(),
-  };
-}
-
-function e2r(e) { return ENT_H.map(h => e[h] !== undefined ? String(e[h]) : ""); }
-function p2r(p) { return PAY_H.map(h => p[h] !== undefined ? String(p[h]) : ""); }
-
-// ── SEED DATA ─────────────────────────────────────────────────────────────────
-const SEED_S = [
-  { id:"SHP-001", type:"international", status:"in_transit", progress:65, mode:"air",
-    origin:{city:"Mumbai",country:"India",code:"BOM"}, destination:{city:"London",country:"UK",code:"LHR"},
-    shipper:{name:"TechCorp India Pvt Ltd",id:"ENT-001"}, receiver:{name:"GlobalTech UK",id:"ENT-003"},
-    carrier:{name:"DHL Express",id:"CAR-001"}, weight:"45.2 kg", dimensions:"80x60x40 cm",
-    value:"$12,500", currency:"USD", paymentStatus:"paid", paymentAmount:850, paymentMethod:"Wire Transfer",
-    createdAt:"2024-03-01", eta:"2024-03-08",
-    tracking:[
-      {date:"2024-03-01 09:00",event:"Shipment Created",location:"Mumbai, India",done:"true"},
-      {date:"2024-03-01 14:30",event:"Picked Up",location:"Mumbai Warehouse",done:"true"},
-      {date:"2024-03-02 18:45",event:"Departed Origin",location:"BOM Airport",done:"true"},
-      {date:"2024-03-05 11:00",event:"Customs Clearance",location:"Heathrow, UK",done:"false"},
-      {date:"2024-03-08 12:00",event:"Delivered",location:"London, UK",done:"false"},
-    ],
-    documents:["Commercial Invoice","Bill of Lading","Packing List","Certificate of Origin"],
-  },
-  { id:"SHP-002", type:"domestic", status:"delivered", progress:100, mode:"ground",
-    origin:{city:"Delhi",country:"India",code:"DEL"}, destination:{city:"Bangalore",country:"India",code:"BLR"},
-    shipper:{name:"Retail Hub India",id:"ENT-002"}, receiver:{name:"Sunrise Distributors",id:"ENT-004"},
-    carrier:{name:"BlueDart Express",id:"CAR-002"}, weight:"12.8 kg", dimensions:"40x30x20 cm",
-    value:"₹45,000", currency:"INR", paymentStatus:"paid", paymentAmount:2200, paymentMethod:"UPI",
-    createdAt:"2024-03-02", eta:"2024-03-05",
-    tracking:[
-      {date:"2024-03-02 10:00",event:"Shipment Created",location:"Delhi",done:"true"},
-      {date:"2024-03-03 08:00",event:"In Transit",location:"Delhi-Agra Highway",done:"true"},
-      {date:"2024-03-05 14:20",event:"Delivered",location:"Bangalore, Karnataka",done:"true"},
-    ],
-    documents:["Invoice","Delivery Receipt"],
-  },
-  { id:"SHP-003", type:"international", status:"pending", progress:10, mode:"sea",
-    origin:{city:"Shanghai",country:"China",code:"PVG"}, destination:{city:"New York",country:"USA",code:"JFK"},
-    shipper:{name:"ManufactureX China",id:"ENT-005"}, receiver:{name:"TechCorp India Pvt Ltd",id:"ENT-001"},
-    carrier:{name:"COSCO Shipping",id:"CAR-003"}, weight:"2450 kg", dimensions:"20ft Container",
-    value:"$89,000", currency:"USD", paymentStatus:"pending", paymentAmount:4200, paymentMethod:"LC",
-    createdAt:"2024-03-05", eta:"2024-04-02",
-    tracking:[
-      {date:"2024-03-05 08:00",event:"Shipment Created",location:"Shanghai, China",done:"true"},
-      {date:"2024-03-10 00:00",event:"Customs Clearance",location:"Shanghai Port",done:"false"},
-      {date:"2024-04-02 00:00",event:"Delivered",location:"Port of Newark",done:"false"},
-    ],
-    documents:["Commercial Invoice","Bill of Lading","Packing List"],
-  },
+// ─── NAV ITEMS ───────────────────────────────────────────────────────────────
+const NAV = [
+  { id: "dashboard", label: "Dashboard", icon: "📊" },
+  { id: "intl-form", label: "International Shipment", icon: "✈️" },
+  { id: "courier-form", label: "Air Courier", icon: "📦" },
+  { id: "intl-records", label: "Intl Records", icon: "🗂️" },
+  { id: "courier-records", label: "Courier Records", icon: "📋" },
+  { id: "reports", label: "Reports", icon: "📈" },
 ];
 
-const SEED_E = [
-  {id:"ENT-001",name:"TechCorp India Pvt Ltd",type:"shipper",country:"India",email:"ops@techcorp.in",phone:"+91-22-4567890",address:"BKC, Mumbai",shipments:24,revenue:"$42,000",createdAt:"2024-01-01"},
-  {id:"ENT-002",name:"Retail Hub India",type:"shipper",country:"India",email:"logistics@retailhub.in",phone:"+91-11-9876543",address:"CP, Delhi",shipments:18,revenue:"₹1,20,000",createdAt:"2024-01-05"},
-  {id:"ENT-003",name:"GlobalTech UK",type:"receiver",country:"UK",email:"imports@globaltech.uk",phone:"+44-20-71234567",address:"Canary Wharf, London",shipments:12,revenue:"$18,500",createdAt:"2024-01-10"},
-  {id:"ENT-004",name:"Sunrise Distributors",type:"receiver",country:"India",email:"admin@sunrisedist.in",phone:"+91-80-2345678",address:"Electronic City, Bangalore",shipments:15,revenue:"₹85,000",createdAt:"2024-01-15"},
-  {id:"ENT-005",name:"ManufactureX China",type:"shipper",country:"China",email:"export@manufacturex.cn",phone:"+86-21-56789012",address:"Pudong, Shanghai",shipments:8,revenue:"$120,000",createdAt:"2024-02-01"},
-  {id:"CAR-001",name:"DHL Express",type:"carrier",country:"Germany",email:"ops@dhl.com",phone:"+49-228-1820",address:"Bonn, Germany",shipments:45,revenue:"$89,000",createdAt:"2024-01-01"},
-  {id:"CAR-002",name:"BlueDart Express",type:"carrier",country:"India",email:"support@bluedart.com",phone:"+91-22-28392988",address:"Mumbai, India",shipments:38,revenue:"₹3,50,000",createdAt:"2024-01-01"},
-  {id:"CAR-003",name:"COSCO Shipping",type:"carrier",country:"China",email:"freight@cosco.com",phone:"+86-21-65962688",address:"Shanghai, China",shipments:12,revenue:"$280,000",createdAt:"2024-01-01"},
-];
+// ─── COMPONENTS ──────────────────────────────────────────────────────────────
 
-const SEED_P = [
-  {id:"PAY-001",shipmentId:"SHP-001",amount:850,currency:"USD",status:"paid",method:"Wire Transfer",date:"2024-03-01",entity:"TechCorp India Pvt Ltd",notes:"Full payment"},
-  {id:"PAY-002",shipmentId:"SHP-002",amount:2200,currency:"INR",status:"paid",method:"UPI",date:"2024-03-02",entity:"Retail Hub India",notes:""},
-  {id:"PAY-003",shipmentId:"SHP-003",amount:4200,currency:"USD",status:"pending",method:"LC",date:"2024-03-05",entity:"ManufactureX China",notes:"LC under review"},
-];
-
-// ── STATUS CHIP ───────────────────────────────────────────────────────────────
-const SC = ({ s }) => {
-  const m = {
-    in_transit:{label:"In Transit",color:"primary"}, delivered:{label:"Delivered",color:"success"},
-    pending:{label:"Pending",color:"warning"}, exception:{label:"Exception",color:"error"},
-    paid:{label:"Paid",color:"success"}, overdue:{label:"Overdue",color:"error"},
-  };
-  const x = m[s] || {label:s,color:"default"};
-  return <Chip label={x.label} color={x.color} size="small" sx={{fontWeight:700,fontSize:"0.68rem"}} />;
-};
-
-const MI = ({ mode, size=16 }) => {
-  if (mode==="air") return <Plane size={size}/>;
-  if (mode==="sea") return <Ship size={size}/>;
-  return <Truck size={size}/>;
-};
-
-const MC = motion(Card);
-
-// ── SYNC BADGE ────────────────────────────────────────────────────────────────
-const SyncBadge = ({ syncing, isDemo, lastSync }) => (
-  <Tooltip title={isDemo?"Demo — data resets on refresh":syncing?"Syncing…":`Last synced: ${lastSync}`}>
-    <Chip size="small"
-      icon={isDemo?<WifiOff size={11}/>:syncing?<RefreshCw size={11} style={{animation:"spin 1s linear infinite"}}/>:<Database size={11}/>}
-      label={isDemo?"DEMO":syncing?"SYNCING":"SYNCED"}
-      sx={{background:isDemo?"rgba(255,107,53,0.15)":syncing?"rgba(255,214,0,0.15)":"rgba(0,230,118,0.15)",
-           color:isDemo?"#FF6B35":syncing?"#FFD600":"#00E676",fontWeight:700,fontSize:"0.62rem"}} />
-  </Tooltip>
-);
-
-// ── SETUP SCREEN ──────────────────────────────────────────────────────────────
-const Setup = ({ onConnect }) => {
-  const [apiKey,setApiKey] = useState("");
-  const [sheetId,setSheetId] = useState("");
-  const [testing,setTesting] = useState(false);
-  const [err,setErr] = useState("");
-
-  const connect = async () => {
-    if (!apiKey.trim()||!sheetId.trim()) { setErr("Both fields required."); return; }
-    setTesting(true); setErr("");
-    try {
-      const svc = new SheetsService(apiKey.trim(), sheetId.trim());
-      await svc.verify();
-      onConnect(apiKey.trim(), sheetId.trim());
-    } catch(e) { setErr(e.message); }
-    setTesting(false);
-  };
-
+function Sidebar({ page, setPage }) {
   return (
-    <Box sx={{minHeight:"100vh",background:"#040B16",display:"flex",alignItems:"center",justifyContent:"center",
-      backgroundImage:"radial-gradient(ellipse at 30% 30%,rgba(0,212,255,0.07) 0%,transparent 60%),radial-gradient(ellipse at 70% 70%,rgba(255,107,53,0.07) 0%,transparent 60%)"}}>
-      <motion.div initial={{opacity:0,y:40}} animate={{opacity:1,y:0}} transition={{duration:0.6}}>
-        <Card sx={{width:520,p:1}}>
-          <CardContent sx={{p:4}}>
-            <Box sx={{display:"flex",alignItems:"center",gap:2,mb:3}}>
-              <Box sx={{p:1.5,borderRadius:3,background:"rgba(0,212,255,0.1)",border:"1px solid rgba(0,212,255,0.3)"}}>
-                <Database size={28} color="#00D4FF"/>
-              </Box>
-              <Box>
-                <Typography variant="h5" sx={{background:"linear-gradient(135deg,#00D4FF,#FF6B35)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
-                  LOGIX PRO
-                </Typography>
-                <Typography variant="caption" color="text.secondary">Google Sheets Persistent Backend</Typography>
-              </Box>
-            </Box>
-
-            <Alert severity="info" sx={{mb:3,background:"rgba(0,212,255,0.05)",border:"1px solid rgba(0,212,255,0.2)",color:"#E2F0FA","& .MuiAlert-icon":{color:"#00D4FF"}}}>
-              <Typography variant="body2" fontWeight={700} sx={{mb:1}}>📋 Google Sheet Setup (5 min):</Typography>
-              <Typography variant="caption" component="div" sx={{lineHeight:2.1}}>
-                <b>1.</b> Create a Google Sheet — add 3 tabs named exactly: <b>Shipments</b>, <b>Entities</b>, <b>Payments</b><br/>
-                <b>2.</b> Go to <b>Google Cloud Console</b> → APIs & Services → Enable <b>Google Sheets API</b><br/>
-                <b>3.</b> Create an <b>API Key</b> (Credentials → + Create Credentials → API Key)<br/>
-                <b>4.</b> Set sheet sharing to <b>"Anyone with the link can view"</b> for read access<br/>
-                <b>5.</b> For write access: share the sheet with a Service Account email and use OAuth (or use Demo mode)<br/>
-                <b>Tip:</b> The Spreadsheet ID is the long string in the URL between <code>/d/</code> and <code>/edit</code>
-              </Typography>
-            </Alert>
-
-            <TextField fullWidth label="Google Sheets API Key" value={apiKey} onChange={e=>setApiKey(e.target.value)}
-              sx={{mb:2}} placeholder="AIzaSy..." type="password"
-              InputProps={{startAdornment:<InputAdornment position="start"><Shield size={15} color="#7A9BB5"/></InputAdornment>}} />
-
-            <TextField fullWidth label="Spreadsheet ID" value={sheetId} onChange={e=>setSheetId(e.target.value)}
-              sx={{mb:2}} placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
-              helperText="From the Google Sheets URL"
-              InputProps={{startAdornment:<InputAdornment position="start"><FileText size={15} color="#7A9BB5"/></InputAdornment>}} />
-
-            {err && <Alert severity="error" sx={{mb:2}}>{err}</Alert>}
-
-            <Button fullWidth variant="contained" size="large" onClick={connect} disabled={testing}
-              startIcon={testing?<CircularProgress size={17} color="inherit"/>:<Wifi size={17}/>} sx={{mb:2}}>
-              {testing?"Verifying connection…":"Connect to Google Sheets"}
-            </Button>
-
-            <Divider sx={{mb:2,borderColor:"rgba(0,212,255,0.1)"}}>
-              <Typography variant="caption" color="text.secondary">OR</Typography>
-            </Divider>
-
-            <Button fullWidth variant="outlined" size="large"
-              sx={{borderColor:"rgba(255,107,53,0.4)",color:"#FF6B35","&:hover":{background:"rgba(255,107,53,0.07)",borderColor:"#FF6B35"}}}
-              onClick={()=>onConnect("DEMO","DEMO")}
-              startIcon={<Zap size={17}/>}>
-              Launch Demo Mode (in-memory only)
-            </Button>
-            <Typography variant="caption" color="text.secondary" display="block" textAlign="center" sx={{mt:1}}>
-              Demo data resets on page refresh. Connect Google Sheets for true persistence.
-            </Typography>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </Box>
-  );
-};
-
-// ── NEW SHIPMENT DIALOG ───────────────────────────────────────────────────────
-const NewShipDlg = ({ open, onClose, onSave, entities }) => {
-  const blank = () => ({
-    id:`SHP-${Date.now()}`, type:"domestic", mode:"ground", status:"pending", progress:0,
-    origin:{city:"",country:"",code:""}, destination:{city:"",country:"",code:""},
-    shipper:{name:"",id:""}, receiver:{name:"",id:""}, carrier:{name:"",id:""},
-    weight:"", dimensions:"", value:"", currency:"INR",
-    paymentStatus:"pending", paymentAmount:0, paymentMethod:"Bank Transfer",
-    createdAt:new Date().toISOString().split("T")[0], eta:"",
-    tracking:[{date:new Date().toISOString().split("T")[0]+" 09:00",event:"Shipment Created",location:"",done:"true"}],
-    documents:[],
-  });
-  const [f,setF] = useState(blank());
-  const [saving,setSaving] = useState(false);
-
-  useEffect(()=>{ if(open) setF(blank()); },[open]);
-
-  const set = (path,val) => setF(prev => {
-    const next = JSON.parse(JSON.stringify(prev));
-    const parts = path.split(".");
-    let cur = next;
-    parts.slice(0,-1).forEach(p=>{ cur=cur[p]; });
-    cur[parts[parts.length-1]] = val;
-    return next;
-  });
-
-  const shippers  = entities.filter(e=>e.type==="shipper");
-  const receivers = entities.filter(e=>e.type==="receiver");
-  const carriers  = entities.filter(e=>e.type==="carrier");
-
-  const save = async () => {
-    if (!f.origin.city||!f.destination.city) return;
-    setSaving(true);
-    await onSave(f);
-    setSaving(false);
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle sx={{borderBottom:"1px solid rgba(0,212,255,0.1)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <Typography variant="h6" sx={{color:"#00D4FF"}}>NEW SHIPMENT</Typography>
-        <IconButton size="small" onClick={onClose}><X size={17}/></IconButton>
-      </DialogTitle>
-      <DialogContent sx={{p:3}}>
-        <Grid container spacing={2} sx={{mt:0}}>
-          <Grid item xs={6}><FormControl fullWidth size="small"><InputLabel>Type</InputLabel>
-            <Select value={f.type} onChange={e=>set("type",e.target.value)} label="Type">
-              <MenuItem value="domestic">Domestic</MenuItem><MenuItem value="international">International</MenuItem>
-            </Select></FormControl></Grid>
-          <Grid item xs={6}><FormControl fullWidth size="small"><InputLabel>Mode</InputLabel>
-            <Select value={f.mode} onChange={e=>set("mode",e.target.value)} label="Mode">
-              <MenuItem value="ground">Ground</MenuItem><MenuItem value="air">Air</MenuItem><MenuItem value="sea">Sea</MenuItem>
-            </Select></FormControl></Grid>
-          <Grid item xs={6}><TextField fullWidth size="small" label="Origin City *" value={f.origin.city} onChange={e=>set("origin.city",e.target.value)}/></Grid>
-          <Grid item xs={6}><TextField fullWidth size="small" label="Origin Country" value={f.origin.country} onChange={e=>set("origin.country",e.target.value)}/></Grid>
-          <Grid item xs={6}><TextField fullWidth size="small" label="Destination City *" value={f.destination.city} onChange={e=>set("destination.city",e.target.value)}/></Grid>
-          <Grid item xs={6}><TextField fullWidth size="small" label="Destination Country" value={f.destination.country} onChange={e=>set("destination.country",e.target.value)}/></Grid>
-          <Grid item xs={4}><FormControl fullWidth size="small"><InputLabel>Shipper</InputLabel>
-            <Select value={f.shipper.id} onChange={e=>{ const en=shippers.find(s=>s.id===e.target.value); set("shipper",{name:en?.name||"",id:e.target.value}); }} label="Shipper">
-              {shippers.map(s=><MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
-            </Select></FormControl></Grid>
-          <Grid item xs={4}><FormControl fullWidth size="small"><InputLabel>Receiver</InputLabel>
-            <Select value={f.receiver.id} onChange={e=>{ const en=receivers.find(r=>r.id===e.target.value); set("receiver",{name:en?.name||"",id:e.target.value}); }} label="Receiver">
-              {receivers.map(r=><MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}
-            </Select></FormControl></Grid>
-          <Grid item xs={4}><FormControl fullWidth size="small"><InputLabel>Carrier</InputLabel>
-            <Select value={f.carrier.id} onChange={e=>{ const en=carriers.find(c=>c.id===e.target.value); set("carrier",{name:en?.name||"",id:e.target.value}); }} label="Carrier">
-              {carriers.map(c=><MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select></FormControl></Grid>
-          <Grid item xs={4}><TextField fullWidth size="small" label="Weight" value={f.weight} onChange={e=>set("weight",e.target.value)} placeholder="45 kg"/></Grid>
-          <Grid item xs={4}><TextField fullWidth size="small" label="Cargo Value" value={f.value} onChange={e=>set("value",e.target.value)} placeholder="$10,000"/></Grid>
-          <Grid item xs={4}><TextField fullWidth size="small" label="Freight Cost" type="number" value={f.paymentAmount} onChange={e=>set("paymentAmount",Number(e.target.value))}/></Grid>
-          <Grid item xs={4}><FormControl fullWidth size="small"><InputLabel>Currency</InputLabel>
-            <Select value={f.currency} onChange={e=>set("currency",e.target.value)} label="Currency">
-              <MenuItem value="INR">INR ₹</MenuItem><MenuItem value="USD">USD $</MenuItem>
-              <MenuItem value="GBP">GBP £</MenuItem><MenuItem value="EUR">EUR €</MenuItem>
-            </Select></FormControl></Grid>
-          <Grid item xs={4}><TextField fullWidth size="small" label="ETA" type="date" value={f.eta} onChange={e=>set("eta",e.target.value)} InputLabelProps={{shrink:true}}/></Grid>
-          <Grid item xs={4}><FormControl fullWidth size="small"><InputLabel>Payment Method</InputLabel>
-            <Select value={f.paymentMethod} onChange={e=>set("paymentMethod",e.target.value)} label="Payment Method">
-              {["Bank Transfer","Wire Transfer","UPI","Letter of Credit","Credit","Cash"].map(m=><MenuItem key={m} value={m}>{m}</MenuItem>)}
-            </Select></FormControl></Grid>
-        </Grid>
-      </DialogContent>
-      <DialogActions sx={{px:3,pb:3,borderTop:"1px solid rgba(0,212,255,0.1)"}}>
-        <Button onClick={onClose} variant="outlined" sx={{borderColor:"rgba(0,212,255,0.3)"}}>Cancel</Button>
-        <Button variant="contained" onClick={save} disabled={saving}
-          startIcon={saving?<CircularProgress size={15} color="inherit"/>:<Save size={15}/>}>
-          {saving?"Saving to Google Sheet…":"Save Shipment"}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
-
-// ── NEW ENTITY DIALOG ─────────────────────────────────────────────────────────
-const NewEntDlg = ({ open, onClose, onSave }) => {
-  const blank = () => ({id:`ENT-${Date.now()}`,name:"",type:"shipper",country:"",email:"",phone:"",address:"",shipments:0,revenue:"0",createdAt:new Date().toISOString().split("T")[0]});
-  const [f,setF] = useState(blank());
-  const [saving,setSaving] = useState(false);
-
-  useEffect(()=>{ if(open) setF(blank()); },[open]);
-
-  const save = async () => {
-    if (!f.name) return;
-    setSaving(true);
-    await onSave(f);
-    setSaving(false);
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{borderBottom:"1px solid rgba(0,212,255,0.1)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <Typography variant="h6" sx={{color:"#00D4FF"}}>NEW ENTITY</Typography>
-        <IconButton size="small" onClick={onClose}><X size={17}/></IconButton>
-      </DialogTitle>
-      <DialogContent sx={{p:3}}>
-        <Grid container spacing={2} sx={{mt:0}}>
-          <Grid item xs={8}><TextField fullWidth size="small" label="Name *" value={f.name} onChange={e=>setF(p=>({...p,name:e.target.value}))}/></Grid>
-          <Grid item xs={4}><FormControl fullWidth size="small"><InputLabel>Type</InputLabel>
-            <Select value={f.type} onChange={e=>setF(p=>({...p,type:e.target.value}))} label="Type">
-              <MenuItem value="shipper">Shipper</MenuItem><MenuItem value="receiver">Receiver</MenuItem><MenuItem value="carrier">Carrier</MenuItem>
-            </Select></FormControl></Grid>
-          <Grid item xs={6}><TextField fullWidth size="small" label="Country" value={f.country} onChange={e=>setF(p=>({...p,country:e.target.value}))}/></Grid>
-          <Grid item xs={6}><TextField fullWidth size="small" label="Email" value={f.email} onChange={e=>setF(p=>({...p,email:e.target.value}))}/></Grid>
-          <Grid item xs={6}><TextField fullWidth size="small" label="Phone" value={f.phone} onChange={e=>setF(p=>({...p,phone:e.target.value}))}/></Grid>
-          <Grid item xs={6}><TextField fullWidth size="small" label="Revenue" value={f.revenue} onChange={e=>setF(p=>({...p,revenue:e.target.value}))}/></Grid>
-          <Grid item xs={12}><TextField fullWidth size="small" label="Address" value={f.address} onChange={e=>setF(p=>({...p,address:e.target.value}))}/></Grid>
-        </Grid>
-      </DialogContent>
-      <DialogActions sx={{px:3,pb:3,borderTop:"1px solid rgba(0,212,255,0.1)"}}>
-        <Button onClick={onClose} variant="outlined" sx={{borderColor:"rgba(0,212,255,0.3)"}}>Cancel</Button>
-        <Button variant="contained" onClick={save} disabled={saving}
-          startIcon={saving?<CircularProgress size={15} color="inherit"/>:<Save size={15}/>}>
-          {saving?"Saving…":"Save Entity"}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
-
-// ── PAY DIALOG ────────────────────────────────────────────────────────────────
-const PayDlg = ({ open, payment, onClose, onPay }) => {
-  const [method,setMethod] = useState("Bank Transfer");
-  const [saving,setSaving] = useState(false);
-  const pay = async () => { setSaving(true); await onPay(payment,method); setSaving(false); onClose(); };
-  if (!payment) return null;
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{borderBottom:"1px solid rgba(0,212,255,0.1)"}}>
-        <Typography variant="h6" sx={{color:"#00E676"}}>PROCESS PAYMENT</Typography>
-      </DialogTitle>
-      <DialogContent sx={{p:3}}>
-        <Typography variant="body2" color="text.secondary" sx={{mb:1}}>{payment.shipmentId}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{mb:2}}>{payment.entity}</Typography>
-        <Typography variant="h4" sx={{color:"#00D4FF",fontFamily:"'Orbitron',monospace",mb:3}}>
-          {payment.currency==="INR"?"₹":"$"}{Number(payment.amount).toLocaleString()}
-        </Typography>
-        <FormControl fullWidth size="small">
-          <InputLabel>Payment Method</InputLabel>
-          <Select value={method} onChange={e=>setMethod(e.target.value)} label="Payment Method">
-            {["Bank Transfer","Wire Transfer","UPI","Letter of Credit","Cash","Credit Card"].map(m=><MenuItem key={m} value={m}>{m}</MenuItem>)}
-          </Select>
-        </FormControl>
-      </DialogContent>
-      <DialogActions sx={{px:3,pb:3}}>
-        <Button onClick={onClose} variant="outlined" sx={{borderColor:"rgba(0,212,255,0.3)"}}>Cancel</Button>
-        <Button variant="contained" color="success" onClick={pay} disabled={saving}
-          startIcon={saving?<CircularProgress size={15} color="inherit"/>:<Check size={15}/>}>
-          {saving?"Processing…":"Confirm Payment"}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
-
-// ── SHIPMENT DETAIL ───────────────────────────────────────────────────────────
-const ShipDetail = ({ shipment, onBack, onAdvance }) => {
-  const [tab,setTab] = useState(0);
-  const [upd,setUpd] = useState(false);
-  const next = {pending:"in_transit",in_transit:"delivered"};
-  const advance = async () => {
-    const ns = next[shipment.status];
-    if (!ns) return;
-    setUpd(true);
-    await onAdvance(shipment.id, ns, ns==="delivered"?100:50);
-    setUpd(false);
-  };
-
-  return (
-    <Box>
-      <motion.div initial={{opacity:0,x:-20}} animate={{opacity:1,x:0}}>
-        <Box sx={{display:"flex",alignItems:"center",gap:2,mb:3,flexWrap:"wrap"}}>
-          <Button variant="outlined" size="small" onClick={onBack} sx={{borderColor:"rgba(0,212,255,0.3)"}}>← Back</Button>
-          <Typography variant="h5" sx={{background:"linear-gradient(135deg,#00D4FF,#FF6B35)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
-            {shipment.id}
-          </Typography>
-          <SC s={shipment.status}/><SC s={shipment.paymentStatus}/>
-          <Box sx={{flex:1}}/>
-          {next[shipment.status] && (
-            <Button variant="contained" size="small" onClick={advance} disabled={upd}
-              startIcon={upd?<CircularProgress size={13} color="inherit"/>:<ArrowRight size={13}/>}>
-              {upd?"Updating Sheet…":"Mark "+next[shipment.status].replace("_"," ")}
-            </Button>
-          )}
-        </Box>
-      </motion.div>
-
-      <Grid container spacing={1.5} sx={{mb:2}}>
-        {[
-          {label:"Origin",value:`${shipment.origin?.city}, ${shipment.origin?.country}`},
-          {label:"Destination",value:`${shipment.destination?.city}, ${shipment.destination?.country}`},
-          {label:"Mode",value:(shipment.mode||"").toUpperCase()},
-          {label:"Carrier",value:shipment.carrier?.name},
-          {label:"Weight",value:shipment.weight},
-          {label:"Value",value:shipment.value},
-          {label:"ETA",value:shipment.eta},
-          {label:"Freight Cost",value:`${shipment.currency==="INR"?"₹":"$"}${Number(shipment.paymentAmount||0).toLocaleString()}`},
-        ].map((item,i)=>(
-          <Grid item xs={6} sm={3} key={i}>
-            <MC initial={{opacity:0,scale:0.9}} animate={{opacity:1,scale:1}} transition={{delay:i*0.04}}>
-              <CardContent sx={{p:1.8}}>
-                <Typography variant="caption" color="text.secondary" display="block">{item.label}</Typography>
-                <Typography variant="body2" fontWeight={700}>{item.value||"—"}</Typography>
-              </CardContent>
-            </MC>
-          </Grid>
+    <div style={styles.sidebar}>
+      {/* Logo */}
+      <div style={{ padding: "28px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: "linear-gradient(135deg,#F39C12,#E67E22)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 20, boxShadow: "0 4px 12px rgba(243,156,18,0.4)"
+            }}>🚢</div>
+            <div>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: 15, letterSpacing: "0.02em" }}>LogiTrack</div>
+              <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>Global Logistics</div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: "16px 12px" }}>
+        {NAV.map((item, i) => (
+          <motion.button
+            key={item.id}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.06 }}
+            onClick={() => setPage(item.id)}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              width: "100%", padding: "10px 14px", marginBottom: 4,
+              borderRadius: 9, border: "none", cursor: "pointer", textAlign: "left",
+              background: page === item.id ? "rgba(255,255,255,0.15)" : "transparent",
+              color: page === item.id ? "#fff" : "rgba(255,255,255,0.6)",
+              fontWeight: page === item.id ? 600 : 400,
+              fontSize: 13, transition: "all 0.18s",
+              borderLeft: page === item.id ? `3px solid ${theme.accent}` : "3px solid transparent",
+            }}
+          >
+            <span style={{ fontSize: 16 }}>{item.icon}</span>
+            {item.label}
+          </motion.button>
         ))}
-      </Grid>
+      </nav>
+      {/* Footer */}
+      <div style={{ padding: "16px 20px", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+        <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11 }}>
+          Connected to Google Sheets
+        </div>
+        <a
+          href={`https://docs.google.com/spreadsheets/d/${SHEET_ID}`}
+          target="_blank" rel="noreferrer"
+          style={{ color: theme.accent, fontSize: 11, fontWeight: 600 }}
+        >
+          Open Spreadsheet ↗
+        </a>
+      </div>
+    </div>
+  );
+}
 
-      <MC sx={{mb:2}} initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.3}}>
-        <CardContent sx={{p:2.5}}>
-          <Box sx={{display:"flex",justifyContent:"space-between",mb:1}}>
-            <Typography variant="body2" fontWeight={700}>Progress</Typography>
-            <Typography variant="body2" color="primary">{shipment.progress}%</Typography>
-          </Box>
-          <Box sx={{height:10,background:"rgba(255,255,255,0.05)",borderRadius:5,overflow:"hidden"}}>
-            <motion.div initial={{width:0}} animate={{width:`${shipment.progress}%`}} transition={{delay:0.5,duration:1}}
-              style={{height:"100%",background:"linear-gradient(90deg,#00D4FF,#FF6B35)",borderRadius:5}}/>
-          </Box>
-        </CardContent>
-      </MC>
+function FieldInput({ field, value, onChange }) {
+  const isDisabled =
+    field.readOnly ||
+    (field.key === "epcgLicense" && value === "-");
 
-      <Tabs value={tab} onChange={(_,v)=>setTab(v)}
-        sx={{mb:2,"& .MuiTab-root":{color:"text.secondary"},"& .Mui-selected":{color:"#00D4FF"},"& .MuiTabs-indicator":{background:"#00D4FF"}}}>
-        <Tab label="Tracking"/><Tab label="Entities"/><Tab label="Documents"/><Tab label="Payment"/>
-      </Tabs>
+  const baseInput = { ...styles.input, ...(isDisabled ? { background: "#F4F6F9", color: theme.textSub } : {}) };
 
-      <AnimatePresence mode="wait">
-        {tab===0 && (
-          <motion.div key="tr" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-            <Card><CardContent sx={{p:2.5}}>
-              <Stepper orientation="vertical">
-                {(shipment.tracking||[]).map((t,i)=>{
-                  const done = t.done==="true"||t.done===true;
-                  return (
-                    <Step key={i} active={done} completed={done}>
-                      <StepLabel StepIconProps={{sx:{color:done?"#00E676 !important":"rgba(255,255,255,0.15) !important"}}}>
-                        <motion.div initial={{opacity:0,x:-10}} animate={{opacity:1,x:0}} transition={{delay:i*0.07}}>
-                          <Typography variant="body2" fontWeight={done?700:400} color={done?"text.primary":"text.secondary"}>{t.event}</Typography>
-                          <Typography variant="caption" color="text.secondary">{t.location} • {t.date}</Typography>
-                        </motion.div>
-                      </StepLabel>
-                      <StepContent><Box/></StepContent>
-                    </Step>
-                  );
-                })}
-              </Stepper>
-            </CardContent></Card>
-          </motion.div>
-        )}
-        {tab===1 && (
-          <motion.div key="en" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-            <Grid container spacing={2}>
-              {[
-                {label:"SHIPPER",data:shipment.shipper,color:"#00D4FF",icon:<Building2 size={18}/>},
-                {label:"RECEIVER",data:shipment.receiver,color:"#FF6B35",icon:<Users size={18}/>},
-                {label:"CARRIER",data:shipment.carrier,color:"#00E676",icon:<Truck size={18}/>},
-              ].map((e,i)=>(
-                <Grid item xs={12} sm={4} key={i}>
-                  <MC initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{delay:i*0.1}}>
-                    <CardContent sx={{p:2}}>
-                      <Box sx={{display:"flex",alignItems:"center",gap:1,mb:1.5,color:e.color}}>{e.icon}
-                        <Typography variant="caption" sx={{color:e.color,fontWeight:700,letterSpacing:2}}>{e.label}</Typography>
-                      </Box>
-                      <Typography fontWeight={700}>{e.data?.name||"—"}</Typography>
-                      <Typography variant="caption" color="text.secondary">{e.data?.id}</Typography>
-                    </CardContent>
-                  </MC>
-                </Grid>
-              ))}
-            </Grid>
-          </motion.div>
-        )}
-        {tab===2 && (
-          <motion.div key="do" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-            <Card><CardContent sx={{p:2.5}}>
-              {!(shipment.documents||[]).length
-                ? <Typography color="text.secondary">No documents attached.</Typography>
-                : <Grid container spacing={1.5}>
-                    {(shipment.documents||[]).map((d,i)=>(
-                      <Grid item xs={12} sm={6} key={i}>
-                        <MC whileHover={{scale:1.02}} sx={{cursor:"pointer"}}>
-                          <CardContent sx={{p:1.5,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                            <Box sx={{display:"flex",alignItems:"center",gap:1.5}}>
-                              <FileText size={17} color="#00D4FF"/><Typography variant="body2" fontWeight={600}>{d}</Typography>
-                            </Box>
-                            <IconButton size="small"><Download size={13}/></IconButton>
-                          </CardContent>
-                        </MC>
-                      </Grid>
-                    ))}
-                  </Grid>}
-            </CardContent></Card>
-          </motion.div>
-        )}
-        {tab===3 && (
-          <motion.div key="pa" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-            <Card><CardContent sx={{p:2.5}}>
-              <Box sx={{display:"flex",justifyContent:"space-between",mb:2}}>
-                <Typography variant="h6">Payment Breakdown</Typography><SC s={shipment.paymentStatus}/>
-              </Box>
-              {[{label:"Freight (70%)",pct:0.7},{label:"Customs (20%)",pct:0.2},{label:"Insurance (5%)",pct:0.05},{label:"Handling (5%)",pct:0.05}].map((item,i)=>(
-                <Box key={i} sx={{display:"flex",justifyContent:"space-between",py:1.5,borderBottom:"1px solid rgba(0,212,255,0.07)"}}>
-                  <Typography variant="body2">{item.label}</Typography>
-                  <Typography fontWeight={700}>{shipment.currency==="INR"?"₹":"$"}{Math.round((shipment.paymentAmount||0)*item.pct).toLocaleString()}</Typography>
-                </Box>
-              ))}
-              <Box sx={{display:"flex",justifyContent:"space-between",pt:2}}>
-                <Typography fontWeight={800}>TOTAL</Typography>
-                <Typography fontWeight={800} color="primary">{shipment.currency==="INR"?"₹":"$"}{Number(shipment.paymentAmount||0).toLocaleString()}</Typography>
-              </Box>
-              <Typography variant="caption" color="text.secondary" sx={{mt:1,display:"block"}}>Method: {shipment.paymentMethod||"—"}</Typography>
-            </CardContent></Card>
+  if (field.type === "computed") {
+    return (
+      <input
+        style={{ ...baseInput, background: "#EBF2FA", fontWeight: 600, color: theme.primary }}
+        value={value !== "" && value !== undefined ? `${value} days` : "—"}
+        readOnly
+      />
+    );
+  }
+  if (field.type === "select") {
+    return (
+      <select style={baseInput} value={value} onChange={(e) => onChange(e.target.value)} disabled={isDisabled}>
+        <option value="">— Select —</option>
+        {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    );
+  }
+  if (field.type === "textarea") {
+    return (
+      <textarea
+        style={{ ...baseInput, resize: "vertical", minHeight: 68 }}
+        value={value} onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+  return (
+    <input
+      style={baseInput}
+      type={field.type === "date" ? "date" : field.type === "number" ? "number" : "text"}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      readOnly={isDisabled}
+    />
+  );
+}
+
+// Group fields into sections
+const INTL_SECTIONS = [
+  { title: "🔖 Basic Information", keys: ["shipmentId","entity","userSPOC","userRequestedDate","mode","incoTerm","dgNonDg","rdProgramDetails","supplierPO"] },
+  { title: "📦 Shipment Details", keys: ["shipper","itemDescription","hsCode","originPort","countryName","commercialInvNo","commercialInvDate","invoiceValue","currency","qty","qtyType","noOfPackage"] },
+  { title: "🛳️ Transport", keys: ["ff","hawbBlNo","etd","eta","pickupDateTarget","pickupDateActual","deliveryDateTarget","deliveryDateActual","tatTarget","tatActual","noOfContainers","destinationPortCode"] },
+  { title: "📜 BOE & Duty", keys: ["boeNumber","boeDate","exRate","boeFreightInr","insuranceFc","taxableValue","bcd","sws","igst","penalty","beGrossDuty","generalEpcg","epcgLicense","demurrageCharges"] },
+  { title: "💳 Clearance & Payment", keys: ["clearanceTaxInvNoCha","clearanceCost","taxInvNoFf","landingFreightCost","logisticsOlaPo","grn","paymentStatus","utrDetails","paymentDate","remarks"] },
+];
+
+const COURIER_SECTIONS = [
+  { title: "🔖 Basic Information", keys: ["shipmentId","entity","userSPOC","userRequestedDate","mode","incoTerm","rdProgramDetails","supplierPO"] },
+  { title: "📦 Shipment Details", keys: ["shipper","itemDescription","hsCode","originPort","countryName","commercialInvNo","commercialInvDate","invoiceValue","currency","qty","qtyType","noOfPackage"] },
+  { title: "✈️ Transport", keys: ["ff","hawbBlNo","etd","eta","pickupDateTarget","pickupDateActual","deliveryDateTarget","deliveryDateActual","tatTarget","tatActual","destinationPortCode"] },
+  { title: "📜 BOE & Duty", keys: ["boeNumber","boeDate","exRate","beGrossDuty","dutyInvoice"] },
+  { title: "💳 Clearance & Payment", keys: ["clearanceTaxInvNoCha","clearanceCost","taxInvNo","landingFreightCost","utrDetails","paymentDate","remarks"] },
+];
+
+function ShipmentForm({ type }) {
+  const fields = type === "intl" ? intlFields : courierFields;
+  const sections = type === "intl" ? INTL_SECTIONS : COURIER_SECTIONS;
+  const sheetName = type === "intl" ? SHEET_NAMES.intl : SHEET_NAMES.courier;
+
+  const [form, setForm] = useState(emptyForm(fields));
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [localRecords, setLocalRecords] = useState([]);
+
+  const handleChange = useCallback((key, val) => {
+    setForm((prev) => {
+      const next = { ...prev, [key]: val };
+      // Auto-handle EPCG
+      if (key === "generalEpcg" && val === "General") next.epcgLicense = "-";
+      if (key === "generalEpcg" && val === "EPCG") next.epcgLicense = "";
+      return computeTAT(next);
+    });
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!form.shipmentId || !form.entity) {
+      setToast({ type: "error", msg: "Shipment ID and Entity are required." });
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+    setSaving(true);
+    // Save locally (simulated) + attempt sheet
+    const rec = { ...computeTAT(form), _savedAt: new Date().toISOString(), _type: type };
+    const storedKey = `logitrack_${type}`;
+    const existing = JSON.parse(sessionStorage.getItem(storedKey) || "[]");
+    existing.push(rec);
+    sessionStorage.setItem(storedKey, JSON.stringify(existing));
+    setLocalRecords(existing);
+
+    // Attempt Google Sheets
+    const result = await appendToSheet(sheetName, rec, fields);
+    setSaving(false);
+
+    if (result?.noScript) {
+      setToast({ type: "warn", msg: "Saved locally. Configure Apps Script to sync with Google Sheets." });
+    } else if (result?.success) {
+      setToast({ type: "success", msg: "Saved to Google Sheets!" });
+    } else {
+      setToast({ type: "warn", msg: "Saved in session. Enable Apps Script for cloud sync." });
+    }
+    setTimeout(() => setToast(null), 4000);
+    setForm(emptyForm(fields));
+  };
+
+  const getField = (key) => fields.find((f) => f.key === key);
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: theme.primary, margin: 0 }}>
+          {type === "intl" ? "✈️ International Shipment" : "📦 Air Courier"}
+        </h1>
+        <p style={{ color: theme.textSub, marginTop: 6, fontSize: 14 }}>
+          Enter shipment details below. TAT fields are calculated automatically.
+        </p>
+      </div>
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{
+              padding: "12px 18px", borderRadius: 9, marginBottom: 20, fontSize: 13, fontWeight: 600,
+              background: toast.type === "success" ? "#D5F5E3" : toast.type === "error" ? "#FADBD8" : "#FEF9E7",
+              color: toast.type === "success" ? "#1E8449" : toast.type === "error" ? "#C0392B" : "#9A7D0A",
+              border: `1px solid ${toast.type === "success" ? "#ABEBC6" : toast.type === "error" ? "#F1948A" : "#F9E79F"}`,
+            }}
+          >
+            {toast.type === "success" ? "✅" : toast.type === "error" ? "❌" : "⚠️"} {toast.msg}
           </motion.div>
         )}
       </AnimatePresence>
-    </Box>
+
+      {/* Sections */}
+      {sections.map((sec, si) => (
+        <motion.div
+          key={sec.title}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: si * 0.07 }}
+          style={styles.card}
+        >
+          <div style={{ fontWeight: 700, fontSize: 15, color: theme.primary, marginBottom: 18, paddingBottom: 12, borderBottom: `1px solid ${theme.border}` }}>
+            {sec.title}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "16px 20px" }}>
+            {sec.keys.map((key) => {
+              const field = getField(key);
+              if (!field) return null;
+              return (
+                <div key={key} style={field.type === "textarea" ? { gridColumn: "1 / -1" } : {}}>
+                  <label style={styles.label}>
+                    {field.label}
+                    {field.required && <span style={{ color: theme.danger }}> *</span>}
+                  </label>
+                  <FieldInput
+                    field={field}
+                    value={form[key] ?? ""}
+                    onChange={(v) => handleChange(key, v)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      ))}
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+        <motion.button
+          whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+          style={{ ...styles.btn, ...styles.btnPrimary, opacity: saving ? 0.7 : 1 }}
+          onClick={handleSubmit} disabled={saving}
+        >
+          {saving ? "⏳ Saving…" : "💾 Save Shipment"}
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+          style={{ ...styles.btn, ...styles.btnOutline }}
+          onClick={() => setForm(emptyForm(fields))}
+        >
+          🔄 Reset
+        </motion.button>
+      </div>
+    </motion.div>
   );
-};
+}
 
-// ── NAV ───────────────────────────────────────────────────────────────────────
-const NAV = [
-  {icon:<BarChart3 size={19}/>,label:"Dashboard",id:"dashboard"},
-  {icon:<Package size={19}/>,label:"All Shipments",id:"shipments"},
-  {icon:<Globe size={19}/>,label:"International",id:"international"},
-  {icon:<Home size={19}/>,label:"Domestic",id:"domestic"},
-  {icon:<Users size={19}/>,label:"Entities",id:"entities"},
-  {icon:<CreditCard size={19}/>,label:"Payments",id:"payments"},
-];
+function RecordsTable({ type }) {
+  const [records, setRecords] = useState([]);
+  const [search, setSearch] = useState("");
+  const [filterEntity, setFilterEntity] = useState("");
+  const [sheetData, setSheetData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("local");
 
-// ── MAIN APP ──────────────────────────────────────────────────────────────────
-export default function App() {
-  const [creds,setCreds]         = useState(null);
-  const [svc,setSvc]             = useState(null);
-  const [isDemo,setIsDemo]       = useState(false);
-  const [shipments,setShipments] = useState([]);
-  const [entities,setEntities]   = useState([]);
-  const [payments,setPayments]   = useState([]);
-  const [page,setPage]           = useState("dashboard");
-  const [selected,setSelected]   = useState(null);
-  const [loading,setLoading]     = useState(false);
-  const [syncing,setSyncing]     = useState(false);
-  const [lastSync,setLastSync]   = useState("Never");
-  const [snack,setSnack]         = useState({open:false,msg:"",sev:"success"});
-  const [newShip,setNewShip]     = useState(false);
-  const [newEnt,setNewEnt]       = useState(false);
-  const [payDlg,setPayDlg]       = useState({open:false,payment:null});
-  const [search,setSearch]       = useState("");
-  const [statusF,setStatusF]     = useState("all");
-  const [entTypeF,setEntTypeF]   = useState("all");
+  useEffect(() => {
+    const key = `logitrack_${type}`;
+    setRecords(JSON.parse(sessionStorage.getItem(key) || "[]"));
+  }, [type]);
 
-  useEffect(()=>{
-    const l=document.createElement("link");
-    l.href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap";
-    l.rel="stylesheet"; document.head.appendChild(l);
-  },[]);
-
-  const notify=(msg,sev="success")=>setSnack({open:true,msg,sev});
-  const ts=()=>setLastSync(new Date().toLocaleTimeString());
-
-  const connect = async (apiKey,sheetId) => {
-    if (apiKey==="DEMO") {
-      setIsDemo(true);
-      setShipments(SEED_S); setEntities(SEED_E); setPayments(SEED_P);
-      setCreds({apiKey,sheetId});
-      notify("Demo mode — data resets on refresh","warning");
-      return;
-    }
-    const service = new SheetsService(apiKey,sheetId);
-    setSvc(service); setCreds({apiKey,sheetId});
+  const loadSheetData = async () => {
     setLoading(true);
+    const sheetName = type === "intl" ? SHEET_NAMES.intl : SHEET_NAMES.courier;
     try {
-      await loadAll(service);
-      notify("Connected! Data loaded from Google Sheets ✓");
-    } catch(e) { notify("Error: "+e.message,"error"); }
-    setLoading(false);
-  };
-
-  const loadAll = async (service) => {
-    setSyncing(true);
-    try {
-      const [rs,re,rp] = await Promise.all([
-        service.read("Shipments"), service.read("Entities"), service.read("Payments"),
-      ]);
-      if (rs.length===0) {
-        await seedAll(service);
-        setShipments(SEED_S); setEntities(SEED_E); setPayments(SEED_P);
-        notify("Empty sheet detected — seeded with sample data ✓");
-      } else {
-        setShipments(rs.map(r2s));
-        setEntities(re);
-        setPayments(rp.map(r=>({...r,amount:Number(r.amount)||0})));
-      }
-      ts();
-    } finally { setSyncing(false); }
-  };
-
-  const seedAll = async (service) => {
-    await Promise.all([
-      service.write("Shipments",SHIP_H,SEED_S.map(s2r)),
-      service.write("Entities",ENT_H,SEED_E.map(e2r)),
-      service.write("Payments",PAY_H,SEED_P.map(p2r)),
-    ]);
-  };
-
-  const syncShipments = async (next) => {
-    setShipments(next);
-    if (!isDemo&&svc) {
-      setSyncing(true);
-      try { await svc.write("Shipments",SHIP_H,next.map(s2r)); ts(); }
-      catch(e) { notify("Sync failed: "+e.message,"error"); }
-      setSyncing(false);
+      const res = await fetch(csvUrl(sheetName));
+      const text = await res.text();
+      const rows = text.split("\n").map((r) =>
+        r.split(",").map((c) => c.replace(/^"|"$/g, "").trim())
+      );
+      const headers = rows[0];
+      const data = rows.slice(1).filter((r) => r.some((c) => c)).map((r) =>
+        headers.reduce((acc, h, i) => ({ ...acc, [h]: r[i] || "" }), {})
+      );
+      setSheetData(data);
+    } catch (e) {
+      setSheetData([{ Error: "Unable to load. Ensure sheet is public." }]);
     }
-  };
-
-  const syncPayments = async (next) => {
-    setPayments(next);
-    if (!isDemo&&svc) {
-      setSyncing(true);
-      try { await svc.write("Payments",PAY_H,next.map(p2r)); ts(); }
-      catch(e) { notify("Sync failed: "+e.message,"error"); }
-      setSyncing(false);
-    }
-  };
-
-  const saveShipment = async (s) => {
-    const next = [...shipments.filter(x=>x.id!==s.id), s];
-    await syncShipments(next);
-    const newPay = {id:`PAY-${Date.now()}`,shipmentId:s.id,amount:s.paymentAmount,currency:s.currency,
-      status:"pending",method:s.paymentMethod,date:s.createdAt,entity:s.shipper?.name||"",notes:"Auto-created"};
-    const nextP = [...payments, newPay];
-    await syncPayments(nextP);
-    notify(isDemo?"Shipment added (Demo)":"Shipment saved to Google Sheets ✓", isDemo?"warning":"success");
-  };
-
-  const saveEntity = async (e) => {
-    const next = [...entities, e];
-    setEntities(next);
-    if (!isDemo&&svc) {
-      setSyncing(true);
-      try { await svc.write("Entities",ENT_H,next.map(e2r)); ts(); notify("Entity saved to Google Sheets ✓"); }
-      catch(err) { notify("Sync failed: "+err.message,"error"); }
-      setSyncing(false);
-    } else { notify("Entity added (Demo)","warning"); }
-  };
-
-  const advanceStatus = async (id,status,progress) => {
-    const next = shipments.map(s=>s.id===id?{...s,status,progress}:s);
-    await syncShipments(next);
-    if (selected?.id===id) setSelected(p=>({...p,status,progress}));
-    notify(isDemo?`Status → "${status}" (Demo)`:`Status → "${status}" saved to Google Sheets ✓`, isDemo?"warning":"success");
-  };
-
-  const processPayment = async (payment,method) => {
-    const nextP = payments.map(p=>p.id===payment.id?{...p,status:"paid",method,date:new Date().toISOString().split("T")[0]}:p);
-    await syncPayments(nextP);
-    const nextS = shipments.map(s=>s.id===payment.shipmentId?{...s,paymentStatus:"paid"}:s);
-    await syncShipments(nextS);
-    notify(isDemo?"Payment processed (Demo)":"Payment saved to Google Sheets ✓", isDemo?"warning":"success");
-  };
-
-  const refresh = async () => {
-    if (isDemo) { notify("Demo mode — nothing to refresh","warning"); return; }
-    if (!svc) return;
-    setLoading(true);
-    try { await loadAll(svc); notify("Refreshed from Google Sheets ✓"); }
-    catch(e) { notify("Refresh failed: "+e.message,"error"); }
     setLoading(false);
+    setActiveTab("sheet");
   };
 
-  if (!creds) return <ThemeProvider theme={theme}><CssBaseline/><Setup onConnect={connect}/></ThemeProvider>;
+  const display = activeTab === "local" ? records : sheetData;
+  const fields = type === "intl" ? intlFields : courierFields;
 
-  const filteredS = (type) => shipments.filter(s=>{
-    const mt = !type||s.type===type;
-    const ms = statusF==="all"||s.status===statusF;
-    const mq = !search||(s.id+s.origin?.city+s.destination?.city).toLowerCase().includes(search.toLowerCase());
-    return mt&&ms&&mq;
+  const filtered = display.filter((r) => {
+    const matchSearch = !search || Object.values(r).some((v) =>
+      String(v).toLowerCase().includes(search.toLowerCase())
+    );
+    const matchEntity = !filterEntity || r.entity === filterEntity || r.Entity === filterEntity;
+    return matchSearch && matchEntity;
   });
 
-  const stats = {
-    total:shipments.length,
-    transit:shipments.filter(s=>s.status==="in_transit").length,
-    delivered:shipments.filter(s=>s.status==="delivered").length,
-    pendingPay:payments.filter(p=>p.status!=="paid").length,
-  };
+  const colKeys = activeTab === "local"
+    ? ["shipmentId", "entity", "shipper", "mode", "originPort", "countryName", "etd", "eta", "tatTarget", "tatActual", "paymentStatus"]
+    : (sheetData[0] ? Object.keys(sheetData[0]).slice(0, 12) : []);
 
-  const renderContent = () => {
-    if (selected) return <ShipDetail shipment={selected} onBack={()=>setSelected(null)} onAdvance={advanceStatus}/>;
+  return (
+    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: theme.primary, margin: 0 }}>
+          {type === "intl" ? "🗂️ International Records" : "📋 Courier Records"}
+        </h1>
+      </div>
 
-    // ── DASHBOARD ──
-    if (page==="dashboard") return (
-      <Box>
-        <motion.div initial={{opacity:0,y:-20}} animate={{opacity:1,y:0}}>
-          <Typography variant="h4" sx={{background:"linear-gradient(135deg,#00D4FF,#FF6B35)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",mb:0.5}}>
-            COMMAND CENTER
-          </Typography>
-          <Typography color="text.secondary" sx={{mb:3}}>{new Date().toLocaleDateString("en-IN",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</Typography>
-        </motion.div>
-
-        <Grid container spacing={2} sx={{mb:3}}>
-          {[
-            {label:"Total Shipments",value:stats.total,icon:<Package size={22}/>,color:"#00D4FF"},
-            {label:"In Transit",value:stats.transit,icon:<Truck size={22}/>,color:"#FF6B35"},
-            {label:"Delivered",value:stats.delivered,icon:<CheckCircle size={22}/>,color:"#00E676"},
-            {label:"Pending Payments",value:stats.pendingPay,icon:<CreditCard size={22}/>,color:"#FFD600"},
-          ].map((s,i)=>(
-            <Grid item xs={6} lg={3} key={i}>
-              <MC initial={{opacity:0,y:30}} animate={{opacity:1,y:0}} transition={{delay:i*0.1}}
-                whileHover={{scale:1.03,boxShadow:`0 8px 32px ${s.color}22`}}>
-                <CardContent sx={{p:2.5}}>
-                  <Box sx={{p:1,borderRadius:2,background:`${s.color}18`,color:s.color,display:"inline-flex",mb:1.5}}>{s.icon}</Box>
-                  <Typography variant="h4" sx={{color:s.color,fontFamily:"'Orbitron',monospace"}}>{s.value}</Typography>
-                  <Typography variant="body2" color="text.secondary">{s.label}</Typography>
-                </CardContent>
-              </MC>
-            </Grid>
-          ))}
-        </Grid>
-
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={7}>
-            <MC initial={{opacity:0,x:-20}} animate={{opacity:1,x:0}} transition={{delay:0.3}}>
-              <CardContent sx={{p:2.5}}>
-                <Box sx={{display:"flex",justifyContent:"space-between",mb:2}}>
-                  <Typography variant="h6" sx={{fontSize:"0.78rem",letterSpacing:2}}>RECENT SHIPMENTS</Typography>
-                  <Button size="small" onClick={()=>setPage("shipments")}>View All →</Button>
-                </Box>
-                {shipments.slice(0,5).map((s,i)=>(
-                  <motion.div key={s.id} initial={{opacity:0,x:-15}} animate={{opacity:1,x:0}} transition={{delay:0.4+i*0.07}}>
-                    <Box onClick={()=>setSelected(s)} sx={{display:"flex",alignItems:"center",gap:2,py:1.5,cursor:"pointer",
-                      borderBottom:"1px solid rgba(0,212,255,0.07)","&:hover":{background:"rgba(0,212,255,0.03)",borderRadius:1,px:0.5}}}>
-                      <Box sx={{p:0.8,borderRadius:1.5,background:s.type==="international"?"#00D4FF18":"#FF6B3518",color:s.type==="international"?"#00D4FF":"#FF6B35"}}>
-                        {s.type==="international"?<Globe size={15}/>:<Home size={15}/>}
-                      </Box>
-                      <Box sx={{flex:1}}>
-                        <Typography variant="body2" fontWeight={700}>{s.id}</Typography>
-                        <Typography variant="caption" color="text.secondary">{s.origin?.city} → {s.destination?.city}</Typography>
-                      </Box>
-                      <SC s={s.status}/><SC s={s.paymentStatus}/>
-                    </Box>
-                  </motion.div>
-                ))}
-              </CardContent>
-            </MC>
-          </Grid>
-
-          <Grid item xs={12} md={5}>
-            <MC initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} transition={{delay:0.3}} sx={{height:"100%"}}>
-              <CardContent sx={{p:2.5}}>
-                <Typography variant="h6" sx={{fontSize:"0.78rem",letterSpacing:2,mb:2}}>STATUS OVERVIEW</Typography>
-                {[
-                  {label:"Delivered",count:stats.delivered,color:"#00E676"},
-                  {label:"In Transit",count:stats.transit,color:"#00D4FF"},
-                  {label:"Pending",count:shipments.filter(s=>s.status==="pending").length,color:"#FFD600"},
-                  {label:"Exception",count:shipments.filter(s=>s.status==="exception").length,color:"#FF1744"},
-                ].map((item,i)=>(
-                  <Box key={i} sx={{mb:2}}>
-                    <Box sx={{display:"flex",justifyContent:"space-between",mb:0.4}}>
-                      <Typography variant="body2" color="text.secondary">{item.label}</Typography>
-                      <Typography variant="body2" fontWeight={700}>{item.count}</Typography>
-                    </Box>
-                    <Box sx={{height:6,background:"rgba(255,255,255,0.05)",borderRadius:4,overflow:"hidden"}}>
-                      <motion.div initial={{width:0}} animate={{width:stats.total?`${(item.count/stats.total)*100}%`:0}}
-                        transition={{delay:0.5+i*0.1,duration:0.8}} style={{height:"100%",background:item.color,borderRadius:4}}/>
-                    </Box>
-                  </Box>
-                ))}
-                <Divider sx={{my:2,borderColor:"rgba(0,212,255,0.08)"}}/>
-                <Typography variant="h6" sx={{fontSize:"0.78rem",letterSpacing:2,mb:2}}>PAYMENT ALERTS</Typography>
-                {payments.filter(p=>p.status!=="paid").slice(0,3).map((p,i)=>(
-                  <Box key={i} sx={{display:"flex",justifyContent:"space-between",alignItems:"center",mb:1.2}}>
-                    <Box>
-                      <Typography variant="body2" fontWeight={700}>{p.shipmentId}</Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap sx={{maxWidth:130,display:"block"}}>{p.entity}</Typography>
-                    </Box>
-                    <Box sx={{textAlign:"right"}}>
-                      <SC s={p.status}/>
-                      <Typography variant="caption" display="block" sx={{mt:0.3}}>{p.currency==="INR"?"₹":"$"}{Number(p.amount).toLocaleString()}</Typography>
-                    </Box>
-                  </Box>
-                ))}
-                {!payments.filter(p=>p.status!=="paid").length && <Typography variant="body2" color="text.secondary">All payments cleared ✓</Typography>}
-              </CardContent>
-            </MC>
-          </Grid>
-        </Grid>
-      </Box>
-    );
-
-    // ── SHIPMENTS LIST ──
-    if (["shipments","international","domestic"].includes(page)) {
-      const type = page==="international"?"international":page==="domestic"?"domestic":null;
-      const list = filteredS(type);
-      return (
-        <Box>
-          <motion.div initial={{opacity:0,y:-20}} animate={{opacity:1,y:0}}>
-            <Box sx={{display:"flex",justifyContent:"space-between",alignItems:"center",mb:3}}>
-              <Box>
-                <Typography variant="h4" sx={{background:"linear-gradient(135deg,#00D4FF,#FF6B35)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
-                  {type?type.toUpperCase():"ALL"} SHIPMENTS
-                </Typography>
-                <Typography color="text.secondary">{list.length} found{!isDemo&&" · synced from Google Sheets"}</Typography>
-              </Box>
-              <Button variant="contained" startIcon={<Plus size={15}/>} onClick={()=>setNewShip(true)}>New Shipment</Button>
-            </Box>
-          </motion.div>
-
-          <Box sx={{display:"flex",gap:2,mb:3,flexWrap:"wrap"}}>
-            <TextField placeholder="Search…" value={search} onChange={e=>setSearch(e.target.value)} size="small" sx={{width:210}}
-              InputProps={{startAdornment:<InputAdornment position="start"><Search size={13}/></InputAdornment>}}/>
-            <FormControl size="small" sx={{minWidth:130}}>
-              <InputLabel>Status</InputLabel>
-              <Select value={statusF} onChange={e=>setStatusF(e.target.value)} label="Status">
-                {["all","in_transit","delivered","pending","exception"].map(v=>(
-                  <MenuItem key={v} value={v}>{v==="all"?"All Status":v.replace("_"," ")}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-
-          <Grid container spacing={2}>
-            {list.map((s,i)=>(
-              <Grid item xs={12} key={s.id}>
-                <MC initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{delay:i*0.06}}
-                  whileHover={{scale:1.006,boxShadow:"0 6px 28px rgba(0,212,255,0.1)"}} sx={{cursor:"pointer"}} onClick={()=>setSelected(s)}>
-                  <CardContent sx={{p:2}}>
-                    <Grid container alignItems="center" spacing={2}>
-                      <Grid item xs={12} sm={3}>
-                        <Box sx={{display:"flex",alignItems:"center",gap:1.5}}>
-                          <Box sx={{p:0.9,borderRadius:2,background:s.type==="international"?"#00D4FF18":"#FF6B3518",color:s.type==="international"?"#00D4FF":"#FF6B35"}}>
-                            {s.type==="international"?<Globe size={17}/>:<Home size={17}/>}
-                          </Box>
-                          <Box>
-                            <Typography fontWeight={800} sx={{fontFamily:"'Orbitron',monospace",fontSize:"0.82rem"}}>{s.id}</Typography>
-                            <Typography variant="caption" color="text.secondary">{s.type?.toUpperCase()}</Typography>
-                          </Box>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} sm={3}>
-                        <Box sx={{display:"flex",alignItems:"center",gap:0.7}}>
-                          <Box><Typography variant="body2" fontWeight={700}>{s.origin?.city}</Typography>
-                            <Typography variant="caption" color="text.secondary">{s.origin?.country}</Typography></Box>
-                          <ArrowRight size={13} color="#00D4FF"/>
-                          <Box><Typography variant="body2" fontWeight={700}>{s.destination?.city}</Typography>
-                            <Typography variant="caption" color="text.secondary">{s.destination?.country}</Typography></Box>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} sm={2}>
-                        <Box sx={{display:"flex",alignItems:"center",gap:0.7,color:"text.secondary"}}>
-                          <MI mode={s.mode}/>
-                          <Typography variant="body2">{(s.mode||"").charAt(0).toUpperCase()+(s.mode||"").slice(1)}</Typography>
-                        </Box>
-                        <Typography variant="caption" color="text.secondary">{s.carrier?.name}</Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={2}>
-                        <LinearProgress variant="determinate" value={Number(s.progress)||0}
-                          sx={{height:5,borderRadius:3,mb:0.5,background:"rgba(255,255,255,0.05)",
-                            "& .MuiLinearProgress-bar":{background:s.status==="delivered"?"#00E676":s.status==="exception"?"#FF1744":"linear-gradient(90deg,#00D4FF,#FF6B35)"}}}/>
-                        <Typography variant="caption" color="text.secondary">{s.progress}% complete</Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={2}>
-                        <Box sx={{display:"flex",gap:0.5,flexWrap:"wrap"}}>
-                          <SC s={s.status}/><SC s={s.paymentStatus}/>
-                        </Box>
-                        <Typography variant="caption" color="text.secondary">{s.value}</Typography>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </MC>
-              </Grid>
+      {/* Tabs + Filters */}
+      <div style={styles.card}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {["local", "sheet"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => { setActiveTab(tab); if (tab === "sheet" && !sheetData.length) loadSheetData(); }}
+                style={{
+                  ...styles.btn, padding: "7px 16px", fontSize: 12,
+                  background: activeTab === tab ? theme.primary : theme.surfaceAlt,
+                  color: activeTab === tab ? "#fff" : theme.textSub,
+                }}
+              >
+                {tab === "local" ? "📁 Session Data" : "📊 Google Sheet"}
+              </button>
             ))}
-          </Grid>
-        </Box>
-      );
-    }
+          </div>
+          <input
+            style={{ ...styles.input, width: 200, padding: "7px 12px" }}
+            placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            style={{ ...styles.input, width: 140, padding: "7px 12px" }}
+            value={filterEntity} onChange={(e) => setFilterEntity(e.target.value)}
+          >
+            <option value="">All Entities</option>
+            {ENTITIES.map((e) => <option key={e}>{e}</option>)}
+          </select>
+          {activeTab === "sheet" && (
+            <button style={{ ...styles.btn, ...styles.btnOutline, padding: "7px 14px", fontSize: 12 }} onClick={loadSheetData}>
+              🔄 Refresh
+            </button>
+          )}
+        </div>
 
-    // ── ENTITIES ──
-    if (page==="entities") {
-      const list = entities.filter(e=>entTypeF==="all"||e.type===entTypeF);
-      return (
-        <Box>
-          <Box sx={{display:"flex",justifyContent:"space-between",alignItems:"center",mb:3}}>
-            <Box>
-              <Typography variant="h4" sx={{background:"linear-gradient(135deg,#00D4FF,#FF6B35)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>ENTITIES</Typography>
-              <Typography color="text.secondary">Shippers · Receivers · Carriers</Typography>
-            </Box>
-            <Button variant="contained" startIcon={<Plus size={15}/>} onClick={()=>setNewEnt(true)}>Add Entity</Button>
-          </Box>
-          <Box sx={{display:"flex",gap:1,mb:3}}>
-            {["all","shipper","receiver","carrier"].map(t=>(
-              <Chip key={t} label={t.charAt(0).toUpperCase()+t.slice(1)} onClick={()=>setEntTypeF(t)}
-                sx={{cursor:"pointer",background:entTypeF===t?"#00D4FF":"transparent",color:entTypeF===t?"#000":"text.secondary",
-                  border:"1px solid",borderColor:entTypeF===t?"#00D4FF":"rgba(0,212,255,0.2)"}}/>
-            ))}
-          </Box>
-          <Grid container spacing={2}>
-            {list.map((e,i)=>(
-              <Grid item xs={12} sm={6} md={4} key={e.id}>
-                <MC initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{delay:i*0.06}} whileHover={{scale:1.02}}>
-                  <CardContent sx={{p:2.5}}>
-                    <Box sx={{display:"flex",justifyContent:"space-between",mb:2}}>
-                      <Box sx={{p:1.1,borderRadius:2,background:e.type==="carrier"?"#FF6B3522":e.type==="shipper"?"#00D4FF22":"#00E67622"}}>
-                        {e.type==="carrier"?<Truck size={17} color="#FF6B35"/>:e.type==="shipper"?<Building2 size={17} color="#00D4FF"/>:<Users size={17} color="#00E676"/>}
-                      </Box>
-                      <Chip label={e.type} size="small" sx={{textTransform:"capitalize"}}/>
-                    </Box>
-                    <Typography fontWeight={800} sx={{mb:0.3}}>{e.name}</Typography>
-                    <Typography variant="caption" color="text.secondary" display="block">{e.id} · {e.country}</Typography>
-                    {e.email&&<Typography variant="caption" color="text.secondary" display="block">{e.email}</Typography>}
-                    {e.phone&&<Typography variant="caption" color="text.secondary" display="block">{e.phone}</Typography>}
-                    <Box sx={{display:"flex",justifyContent:"space-between",mt:1.5}}>
-                      <Box><Typography variant="caption" color="text.secondary">Shipments</Typography>
-                        <Typography variant="body2" fontWeight={700} color="primary">{e.shipments||0}</Typography></Box>
-                      <Box><Typography variant="caption" color="text.secondary">Revenue</Typography>
-                        <Typography variant="body2" fontWeight={700} color="secondary">{e.revenue||"—"}</Typography></Box>
-                    </Box>
-                  </CardContent>
-                </MC>
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-      );
-    }
-
-    // ── PAYMENTS ──
-    if (page==="payments") {
-      const total   = payments.reduce((a,p)=>a+Number(p.amount||0),0);
-      const paid    = payments.filter(p=>p.status==="paid").reduce((a,p)=>a+Number(p.amount||0),0);
-      const pending = payments.filter(p=>p.status==="pending").reduce((a,p)=>a+Number(p.amount||0),0);
-      const overdue = payments.filter(p=>p.status==="overdue").reduce((a,p)=>a+Number(p.amount||0),0);
-      return (
-        <Box>
-          <Box sx={{display:"flex",justifyContent:"space-between",alignItems:"center",mb:3}}>
-            <Box>
-              <Typography variant="h4" sx={{background:"linear-gradient(135deg,#00D4FF,#FF6B35)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>PAYMENTS</Typography>
-              <Typography color="text.secondary">Freight billing — {isDemo?"Demo":"Google Sheets backed"}</Typography>
-            </Box>
-          </Box>
-          <Grid container spacing={2} sx={{mb:3}}>
-            {[
-              {label:"Total Billed",value:total,color:"#00D4FF"},
-              {label:"Collected",value:paid,color:"#00E676"},
-              {label:"Pending",value:pending,color:"#FFD600"},
-              {label:"Overdue",value:overdue,color:"#FF1744"},
-            ].map((s,i)=>(
-              <Grid item xs={6} sm={3} key={i}>
-                <MC initial={{opacity:0,scale:0.9}} animate={{opacity:1,scale:1}} transition={{delay:i*0.08}}>
-                  <CardContent sx={{p:2,textAlign:"center"}}>
-                    <Typography variant="caption" color="text.secondary">{s.label}</Typography>
-                    <Typography variant="h5" sx={{color:s.color,fontFamily:"'Orbitron',monospace",mt:0.5}}>{s.value.toLocaleString()}</Typography>
-                  </CardContent>
-                </MC>
-              </Grid>
-            ))}
-          </Grid>
-          <MC initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{delay:0.3}}>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{"& th":{borderColor:"rgba(0,212,255,0.07)",color:"#00D4FF",fontWeight:700,fontFamily:"'Orbitron',monospace",fontSize:"0.68rem",letterSpacing:1}}}>
-                    {["PAYMENT ID","SHIPMENT","ENTITY","AMOUNT","METHOD","DATE","STATUS","ACTION"].map(h=><TableCell key={h}>{h}</TableCell>)}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {payments.map((p,i)=>(
-                    <motion.tr key={p.id} initial={{opacity:0,x:-15}} animate={{opacity:1,x:0}} transition={{delay:0.35+i*0.06}}>
-                      <TableCell sx={{color:"#00D4FF",fontWeight:700,fontSize:"0.78rem"}}>{p.id}</TableCell>
-                      <TableCell><Typography variant="body2">{p.shipmentId}</Typography></TableCell>
-                      <TableCell><Typography variant="body2" noWrap sx={{maxWidth:150}}>{p.entity}</Typography></TableCell>
-                      <TableCell><Typography fontWeight={700}>{p.currency==="INR"?"₹":"$"}{Number(p.amount||0).toLocaleString()}</Typography></TableCell>
-                      <TableCell><Typography variant="body2" color="text.secondary">{p.method}</Typography></TableCell>
-                      <TableCell><Typography variant="body2" color="text.secondary">{p.date}</Typography></TableCell>
-                      <TableCell><SC s={p.status}/></TableCell>
-                      <TableCell>
-                        {p.status!=="paid"
-                          ? <Button size="small" variant="outlined"
-                              sx={{fontSize:"0.64rem",borderColor:"#00E676",color:"#00E676","&:hover":{background:"rgba(0,230,118,0.07)"}}}
-                              onClick={()=>setPayDlg({open:true,payment:p})}>Pay Now</Button>
-                          : <Check size={15} color="#00E676"/>}
-                      </TableCell>
-                    </motion.tr>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 40, color: theme.textSub }}>⏳ Loading from Google Sheets…</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, color: theme.textLight, fontSize: 14 }}>
+            {activeTab === "local" ? "No session records. Submit a form to see data here." : "No data found."}
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: theme.surfaceAlt }}>
+                  {colKeys.map((k) => (
+                    <th key={k} style={{ padding: "10px 12px", textAlign: "left", color: theme.textSub, fontWeight: 600, fontSize: 11, letterSpacing: "0.05em", textTransform: "uppercase", borderBottom: `1.5px solid ${theme.border}`, whiteSpace: "nowrap" }}>
+                      {fields.find((f) => f.key === k)?.label || k}
+                    </th>
                   ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </MC>
-        </Box>
-      );
-    }
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row, ri) => (
+                  <motion.tr
+                    key={ri}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: ri * 0.03 }}
+                    style={{ borderBottom: `1px solid ${theme.border}`, background: ri % 2 === 0 ? "#fff" : "#FAFCFF" }}
+                  >
+                    {colKeys.map((k) => {
+                      const val = row[k] ?? row[fields.find(f=>f.key===k)?.label] ?? "";
+                      const isStatus = k === "paymentStatus";
+                      return (
+                        <td key={k} style={{ padding: "9px 12px", color: theme.text, whiteSpace: "nowrap" }}>
+                          {isStatus ? (
+                            <span style={{
+                              ...styles.tag,
+                              background: val === "Paid" ? "#D5F5E3" : val === "Pending" ? "#FEF9E7" : val === "On Hold" ? "#FADBD8" : "#EBF5FB",
+                              color: val === "Paid" ? "#1E8449" : val === "Pending" ? "#9A7D0A" : val === "On Hold" ? "#C0392B" : "#1A5276",
+                            }}>{val || "—"}</span>
+                          ) : (val || "—")}
+                        </td>
+                      );
+                    })}
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div style={{ marginTop: 12, fontSize: 12, color: theme.textLight }}>
+          Showing {filtered.length} record(s)
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
-    return null;
+function Reports() {
+  const [intlData, setIntlData] = useState([]);
+  const [courierData, setCourierData] = useState([]);
+
+  useEffect(() => {
+    setIntlData(JSON.parse(sessionStorage.getItem("logitrack_intl") || "[]"));
+    setCourierData(JSON.parse(sessionStorage.getItem("logitrack_courier") || "[]"));
+  }, []);
+
+  const all = [...intlData.map(r=>({...r,_shipType:"International"})), ...courierData.map(r=>({...r,_shipType:"Courier"}))];
+
+  // Stats
+  const totalShipments = all.length;
+  const byEntity = ENTITIES.map(e=>({ entity: e, count: all.filter(r=>r.entity===e).length }));
+  const byType = [
+    { label: "International", count: intlData.length },
+    { label: "Air Courier", count: courierData.length },
+  ];
+  const paymentSummary = PAYMENT_STATUS.map(s=>({ status: s, count: all.filter(r=>r.paymentStatus===s).length }));
+  const avgTatTarget = all.filter(r=>r.tatTarget!=="").reduce((a,r)=>a+(Number(r.tatTarget)||0), 0) / (all.filter(r=>r.tatTarget!=="").length||1);
+  const avgTatActual = all.filter(r=>r.tatActual!=="").reduce((a,r)=>a+(Number(r.tatActual)||0), 0) / (all.filter(r=>r.tatActual!=="").length||1);
+
+  const StatCard = ({ label, value, sub, color = theme.primary }) => (
+    <motion.div
+      whileHover={{ y: -3, boxShadow: "0 8px 30px rgba(27,79,114,0.13)" }}
+      style={{ ...styles.card, marginBottom: 0, flex: 1, minWidth: 160 }}
+    >
+      <div style={{ fontSize: 28, fontWeight: 800, color }}>{value}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: theme.text, marginTop: 4 }}>{label}</div>
+      {sub && <div style={{ fontSize: 11, color: theme.textSub, marginTop: 2 }}>{sub}</div>}
+    </motion.div>
+  );
+
+  const BarRow = ({ label, value, max, color = theme.primary }) => (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+        <span style={{ color: theme.text, fontWeight: 500 }}>{label}</span>
+        <span style={{ color: theme.textSub }}>{value}</span>
+      </div>
+      <div style={{ height: 8, background: theme.border, borderRadius: 4, overflow: "hidden" }}>
+        <motion.div
+          initial={{ width: 0 }} animate={{ width: max ? `${(value/max)*100}%` : "0%" }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          style={{ height: "100%", background: color, borderRadius: 4 }}
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}>
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: theme.primary, margin: 0 }}>📈 Reports & Analytics</h1>
+        <p style={{ color: theme.textSub, marginTop: 6, fontSize: 14 }}>
+          Summary of session data. Connect Google Sheets for persistent analytics.
+        </p>
+      </div>
+
+      {totalShipments === 0 ? (
+        <div style={{ ...styles.card, textAlign: "center", padding: "60px 24px" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: theme.textSub }}>No data yet</div>
+          <div style={{ fontSize: 13, color: theme.textLight, marginTop: 6 }}>Submit shipments to see reports here</div>
+        </div>
+      ) : (
+        <>
+          {/* KPI Cards */}
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+            <StatCard label="Total Shipments" value={totalShipments} />
+            <StatCard label="International" value={intlData.length} color={theme.primaryLight} />
+            <StatCard label="Air Courier" value={courierData.length} color={theme.accent} />
+            <StatCard label="Avg TAT Target" value={`${avgTatTarget.toFixed(1)}d`} sub="days" color={theme.success} />
+            <StatCard label="Avg TAT Actual" value={`${avgTatActual.toFixed(1)}d`} sub="days" color={theme.danger} />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+            {/* By Entity */}
+            <div style={styles.card}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: theme.primary, marginBottom: 16 }}>Shipments by Entity</div>
+              {byEntity.map((e) => (
+                <BarRow key={e.entity} label={e.entity} value={e.count} max={Math.max(...byEntity.map(x=>x.count),1)} color={theme.primary} />
+              ))}
+            </div>
+
+            {/* Payment Status */}
+            <div style={styles.card}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: theme.primary, marginBottom: 16 }}>Payment Status</div>
+              {paymentSummary.map((p) => (
+                <BarRow key={p.status} label={p.status} value={p.count} max={Math.max(...paymentSummary.map(x=>x.count),1)}
+                  color={p.status==="Paid"?theme.success:p.status==="Pending"?theme.accent:p.status==="On Hold"?theme.danger:theme.primaryLight}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Shipments Table */}
+          <div style={styles.card}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: theme.primary, marginBottom: 16 }}>Recent Shipments</div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: theme.surfaceAlt }}>
+                    {["Type","Shipment ID","Entity","Shipper","Country","ETD","ETA","TAT Target","TAT Actual","Payment"].map(h => (
+                      <th key={h} style={{ padding: "9px 12px", textAlign: "left", color: theme.textSub, fontWeight: 600, fontSize: 11, letterSpacing: "0.05em", textTransform: "uppercase", borderBottom: `1.5px solid ${theme.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {all.slice(-20).reverse().map((r, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${theme.border}`, background: i%2===0?"#fff":"#FAFCFF" }}>
+                      {[r._shipType||"—",r.shipmentId||"—",r.entity||"—",r.shipper||"—",r.countryName||"—",r.etd||"—",r.eta||"—",
+                        r.tatTarget!==""?`${r.tatTarget}d`:"—",r.tatActual!==""?`${r.tatActual}d`:"—"].map((v,j)=>(
+                        <td key={j} style={{ padding: "8px 12px", color: theme.text, whiteSpace: "nowrap" }}>{v}</td>
+                      ))}
+                      <td style={{ padding: "8px 12px" }}>
+                        <span style={{
+                          ...styles.tag,
+                          background: r.paymentStatus==="Paid"?"#D5F5E3":r.paymentStatus==="Pending"?"#FEF9E7":"#EBF5FB",
+                          color: r.paymentStatus==="Paid"?"#1E8449":r.paymentStatus==="Pending"?"#9A7D0A":"#1A5276",
+                        }}>{r.paymentStatus||"—"}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </motion.div>
+  );
+}
+
+function Dashboard({ setPage }) {
+  const intlCount = JSON.parse(sessionStorage.getItem("logitrack_intl")||"[]").length;
+  const courierCount = JSON.parse(sessionStorage.getItem("logitrack_courier")||"[]").length;
+
+  const cards = [
+    { icon: "✈️", title: "International Shipment", desc: "Log full international freight with BOE, duties & customs", page: "intl-form", color: theme.primary },
+    { icon: "📦", title: "Air Courier", desc: "Quick entry for courier & express shipments", page: "courier-form", color: "#1A5276" },
+    { icon: "🗂️", title: "Intl Records", desc: `${intlCount} session record(s)`, page: "intl-records", color: theme.primaryLight },
+    { icon: "📋", title: "Courier Records", desc: `${courierCount} session record(s)`, page: "courier-records", color: "#2471A3" },
+    { icon: "📈", title: "Reports", desc: "Analytics & shipment summary", page: "reports", color: theme.accent },
+    { icon: "📊", title: "Open Google Sheet", desc: "View & edit the source spreadsheet", page: null, color: theme.success, external: `https://docs.google.com/spreadsheets/d/${SHEET_ID}` },
+  ];
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div style={{ marginBottom: 32 }}>
+        <motion.h1
+          initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
+          style={{ fontSize: 28, fontWeight: 800, color: theme.primary, margin: 0 }}
+        >
+          🚢 LogiTrack Dashboard
+        </motion.h1>
+        <motion.p
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
+          style={{ color: theme.textSub, marginTop: 8, fontSize: 14 }}
+        >
+          Global logistics tracking system — International Shipments & Air Courier
+        </motion.p>
+      </div>
+
+      {/* Info Banner */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+        style={{ ...styles.card, background: "#EBF5FB", border: "1px solid #AED6F1", marginBottom: 28 }}
+      >
+        <div style={{ fontSize: 13, color: "#1A5276", fontWeight: 500 }}>
+          <strong>📌 Google Sheets Integration:</strong> This app reads from and writes to your Google Sheet.
+          Data entered in session is stored locally. To enable full cloud sync, deploy a Google Apps Script web app and update the <code>APPS_SCRIPT_URL</code> constant in the code.
+          {" "}<a href={`https://docs.google.com/spreadsheets/d/${SHEET_ID}`} target="_blank" rel="noreferrer" style={{ color: theme.primary, fontWeight: 700 }}>Open Sheet ↗</a>
+        </div>
+      </motion.div>
+
+      {/* Quick Stats */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
+        {[
+          { label: "Intl Shipments", value: intlCount, icon: "✈️" },
+          { label: "Courier Shipments", value: courierCount, icon: "📦" },
+          { label: "Total Records", value: intlCount + courierCount, icon: "📊" },
+        ].map((s, i) => (
+          <motion.div
+            key={s.label}
+            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.08 }}
+            style={{ ...styles.card, marginBottom: 0, flex: 1, minWidth: 140, textAlign: "center" }}
+          >
+            <div style={{ fontSize: 32 }}>{s.icon}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: theme.primary, marginTop: 4 }}>{s.value}</div>
+            <div style={{ fontSize: 12, color: theme.textSub, marginTop: 2 }}>{s.label}</div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Nav Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
+        {cards.map((c, i) => (
+          <motion.div
+            key={c.title}
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.07 }}
+            whileHover={{ y: -5, boxShadow: "0 12px 40px rgba(27,79,114,0.14)" }}
+            onClick={() => c.external ? window.open(c.external, "_blank") : setPage(c.page)}
+            style={{ ...styles.card, cursor: "pointer", marginBottom: 0, borderTop: `4px solid ${c.color}` }}
+          >
+            <div style={{ fontSize: 32, marginBottom: 10 }}>{c.icon}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: theme.text, marginBottom: 6 }}>{c.title}</div>
+            <div style={{ fontSize: 13, color: theme.textSub }}>{c.desc}</div>
+            <div style={{ marginTop: 14, fontSize: 12, fontWeight: 600, color: c.color }}>
+              {c.external ? "Open ↗" : "Go →"}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── APP ─────────────────────────────────────────────────────────────────────
+export default function App() {
+  const [page, setPage] = useState("dashboard");
+
+  const renderPage = () => {
+    switch (page) {
+      case "dashboard": return <Dashboard setPage={setPage} />;
+      case "intl-form": return <ShipmentForm type="intl" />;
+      case "courier-form": return <ShipmentForm type="courier" />;
+      case "intl-records": return <RecordsTable type="intl" />;
+      case "courier-records": return <RecordsTable type="courier" />;
+      case "reports": return <Reports />;
+      default: return <Dashboard setPage={setPage} />;
+    }
   };
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline/>
-      <Box sx={{display:"flex",minHeight:"100vh",background:"#040B16",
-        backgroundImage:"radial-gradient(ellipse at 20% 10%,rgba(0,212,255,0.05) 0%,transparent 55%),radial-gradient(ellipse at 80% 90%,rgba(255,107,53,0.05) 0%,transparent 55%)"}}>
-
-        {/* Sidebar */}
-        <Drawer variant="permanent"
-          sx={{width:228,flexShrink:0,"& .MuiDrawer-paper":{width:228,background:"linear-gradient(180deg,#040D1C 0%,#071328 100%)",borderRight:"1px solid rgba(0,212,255,0.08)",boxSizing:"border-box"}}}>
-          <Box sx={{p:2.5,borderBottom:"1px solid rgba(0,212,255,0.08)"}}>
-            <Box sx={{display:"flex",alignItems:"center",gap:1.5}}>
-              <Box sx={{p:1,borderRadius:2,background:"linear-gradient(135deg,#00D4FF,#006699)"}}><Navigation size={17} color="#fff"/></Box>
-              <Box>
-                <Typography variant="h6" sx={{fontSize:"0.82rem",background:"linear-gradient(135deg,#00D4FF,#FF6B35)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>LOGIX PRO</Typography>
-                <Typography variant="caption" color="text.secondary" sx={{fontSize:"0.65rem"}}>Sheets Persistent Backend</Typography>
-              </Box>
-            </Box>
-          </Box>
-
-          <List sx={{px:1,py:1.5,flex:1}}>
-            {NAV.map(item=>(
-              <motion.div key={item.id} whileHover={{x:3}} whileTap={{scale:0.97}}>
-                <ListItem button onClick={()=>{ setPage(item.id); setSelected(null); }}
-                  sx={{borderRadius:2,mb:0.3,background:page===item.id?"linear-gradient(135deg,rgba(0,212,255,0.12),rgba(0,212,255,0.03))":"transparent",
-                    borderLeft:`3px solid ${page===item.id?"#00D4FF":"transparent"}`,
-                    "&:hover":{background:"rgba(0,212,255,0.06)"}}}>
-                  <ListItemIcon sx={{color:page===item.id?"#00D4FF":"#7A9BB5",minWidth:33}}>{item.icon}</ListItemIcon>
-                  <ListItemText primary={item.label}
-                    primaryTypographyProps={{variant:"body2",fontWeight:page===item.id?700:400,color:page===item.id?"#00D4FF":"#7A9BB5",fontSize:"0.84rem"}}/>
-                </ListItem>
-              </motion.div>
-            ))}
-          </List>
-
-          <Box sx={{p:2,borderTop:"1px solid rgba(0,212,255,0.08)"}}>
-            <Box sx={{display:"flex",alignItems:"center",gap:1.5,mb:1}}>
-              <Avatar sx={{width:28,height:28,background:"linear-gradient(135deg,#00D4FF,#FF6B35)",fontSize:"0.72rem"}}>AD</Avatar>
-              <Box sx={{flex:1}}><Typography variant="body2" fontWeight={700} sx={{fontSize:"0.82rem"}}>Admin</Typography>
-                <Typography variant="caption" color="text.secondary" sx={{fontSize:"0.68rem"}}>Super Admin</Typography></Box>
-            </Box>
-            <SyncBadge syncing={syncing} isDemo={isDemo} lastSync={lastSync}/>
-          </Box>
-        </Drawer>
-
-        {/* Main area */}
-        <Box sx={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-          <AppBar position="sticky" sx={{background:"rgba(4,11,22,0.93)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(0,212,255,0.08)",boxShadow:"none"}}>
-            <Toolbar sx={{gap:2,minHeight:"54px !important"}}>
-              <TextField placeholder="Search shipments…" value={search} onChange={e=>setSearch(e.target.value)} size="small"
-                InputProps={{startAdornment:<InputAdornment position="start"><Search size={13}/></InputAdornment>}}
-                sx={{width:240,"& .MuiOutlinedInput-root":{height:33}}}/>
-              <Box sx={{flex:1}}/>
-              <Tooltip title={isDemo?"Demo mode":"Refresh from Google Sheets"}>
-                <span>
-                  <IconButton size="small" onClick={refresh} disabled={loading||isDemo}>
-                    <RefreshCw size={16} color="#7A9BB5" style={{animation:loading?"spin 1s linear infinite":"none"}}/>
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <SyncBadge syncing={syncing} isDemo={isDemo} lastSync={lastSync}/>
-              <Avatar sx={{width:28,height:28,background:"linear-gradient(135deg,#00D4FF,#FF6B35)",fontSize:"0.7rem"}}>AD</Avatar>
-            </Toolbar>
-          </AppBar>
-
-          <Box sx={{flex:1,overflow:"auto",p:3}}>
-            {loading
-              ? <Box sx={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",flexDirection:"column",gap:2}}>
-                  <CircularProgress color="primary"/>
-                  <Typography color="text.secondary">Loading from Google Sheets…</Typography>
-                </Box>
-              : <AnimatePresence mode="wait">
-                  <motion.div key={page+(selected?.id||"")} initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-14}} transition={{duration:0.22}}>
-                    {renderContent()}
-                  </motion.div>
-                </AnimatePresence>}
-          </Box>
-        </Box>
-      </Box>
-
-      <NewShipDlg open={newShip} onClose={()=>setNewShip(false)} onSave={saveShipment} entities={entities}/>
-      <NewEntDlg  open={newEnt}  onClose={()=>setNewEnt(false)}  onSave={saveEntity}/>
-      <PayDlg open={payDlg.open} payment={payDlg.payment} onClose={()=>setPayDlg({open:false,payment:null})} onPay={processPayment}/>
-
-      <Snackbar open={snack.open} autoHideDuration={4000} onClose={()=>setSnack(p=>({...p,open:false}))} anchorOrigin={{vertical:"bottom",horizontal:"right"}}>
-        <Alert severity={snack.sev} onClose={()=>setSnack(p=>({...p,open:false}))} sx={{borderRadius:2}}>{snack.msg}</Alert>
-      </Snackbar>
-
-      <style>{`
-        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-        ::-webkit-scrollbar{width:5px;height:5px}
-        ::-webkit-scrollbar-track{background:rgba(0,0,0,0.15)}
-        ::-webkit-scrollbar-thumb{background:rgba(0,212,255,0.25);border-radius:3px}
-      `}</style>
-    </ThemeProvider>
+    <div style={styles.app}>
+      <Sidebar page={page} setPage={setPage} />
+      <main style={styles.main}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={page}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            transition={{ duration: 0.25 }}
+          >
+            {renderPage()}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+    </div>
   );
 }
