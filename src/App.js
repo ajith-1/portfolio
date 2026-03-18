@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-// import Portfolio from "./Portfolio";
+import Portfolio from "./Portfolio";
 import AjithKumar from "./AjithKumar";
 import AjithKumarM from "./AjithKumarM";
+import Newlook from "./Newlook";
 
 
 
@@ -10,7 +11,8 @@ export default function App() {
 <>
 {/* <Portfolio/> */}
 {/* <AjithKumar/> */}
-<AjithKumarM/>
+{/* <AjithKumarM/> */}
+<Newlook/>
 
 </>
 
