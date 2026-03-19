@@ -88,7 +88,7 @@ function Navbar({ active }) {
         style={{ position:"fixed", top:0, left:0, right:0, zIndex:100, background: scrolled?"rgba(255,255,255,0.97)":"rgba(255,255,255,0.92)", backdropFilter:"blur(14px)", boxShadow: scrolled?"0 1px 20px rgba(30,58,95,0.08)":"none", transition:"all 0.12s" }}>
         <div className="inner" style={{ padding:"0 clamp(14px,3.5vw,48px)", height:58, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <motion.div whileHover={{ scale:1.03 }} onClick={() => go("Home")} style={{ cursor:"pointer" }}>
-            <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:17, color:p.navy }}>Ajith<span style={{ color:p.lime }}>.</span></span>
+            <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:17, color:p.navy }}>Ajith Kumar<span style={{ color:p.lime }}>.</span></span>
           </motion.div>
 
           <div className="desk-nav" style={{ display:"flex", gap:2, alignItems:"center" }}>
@@ -124,7 +124,7 @@ function Navbar({ active }) {
 /* ── HERO ───────────────────────────────────────────────────────── */
 function Hero() {
   return (
-    <section id="home" style={{ minHeight:"100vh", background:`linear-gradient(140deg,${p.midnight} 0%,${p.navy} 65%,#0D1F35 100%)`, display:"flex", alignItems:"center", position:"relative", overflow:"hidden", padding:"58px clamp(14px,4.5vw,72px) 60px" }}>
+    <section id="home" style={{ minHeight:"100vh", background:`linear-gradient(140deg,${p.midnight} 0%,${p.navy} 65%,#0D1F35 100%)`, display:"flex", alignItems:"center", position:"relative", overflow:"hidden", padding:"70px clamp(16px,5vw,60px) 60px" }}>
 
       {/* Subtle grid */}
       <div style={{ position:"absolute", inset:0, opacity:0.03, backgroundImage:`linear-gradient(${p.white} 1px,transparent 1px),linear-gradient(90deg,${p.white} 1px,transparent 1px)`, backgroundSize:"50px 50px", pointerEvents:"none" }} />
@@ -141,7 +141,7 @@ function Hero() {
       ))}
 
       {/* Main grid: left content | right panel */}
-      <div className="inner" style={{ display:"grid", gridTemplateColumns:"1fr auto", alignItems:"center", gap:"clamp(24px,4vw,64px)", position:"relative", zIndex:2, width:"100%" }}>
+      <div className="inner hero-grid" style={{ display:"grid", gridTemplateColumns:"1fr auto", alignItems:"center", gap:"clamp(24px,4vw,64px)", position:"relative", zIndex:2, width:"100%" }}>
 
         {/* LEFT */}
         <motion.div initial={{ opacity:0, x:-40 }} animate={{ opacity:1, x:0 }} transition={{ duration:0.75, ease:"easeOut" }}>
@@ -309,7 +309,7 @@ function About() {
     { label:"Status",          value:"Open to New Opportunities",             icon:"star",      bg:`${p.yellow}22`,fg:p.dark,  sub:"#666",                   accent:"#b8a000",wide:false,border:`1.5px solid ${p.yellow}88` },
   ];
   return (
-    <section id="about" style={{ padding:"56px clamp(14px,4vw,56px)", background:p.white }}>
+    <section id="about" style={{ padding:"clamp(36px,5vw,56px) clamp(16px,5vw,56px)", background:p.white }}>
       <div className="inner" ref={ref}>
         <motion.div initial={{ opacity:0,y:28 }} animate={vis?{opacity:1,y:0}:{}} transition={{ duration:0.6 }}>
           <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
@@ -321,8 +321,8 @@ function About() {
           </h2>
         </motion.div>
 
-        <div style={{ display:"flex", gap:36, flexWrap:"wrap", alignItems:"flex-start" }}>
-          <motion.div initial={{ opacity:0,x:-28 }} animate={vis?{opacity:1,x:0}:{}} transition={{ duration:0.6, delay:0.14 }} style={{ flex:"1 1 280px", maxWidth:480 }}>
+        <div className="about-grid" style={{ display:"flex", gap:36, flexWrap:"wrap", alignItems:"flex-start" }}>
+          <motion.div initial={{ opacity:0,x:-28 }} animate={vis?{opacity:1,x:0}:{}} transition={{ duration:0.6, delay:0.14 }} style={{ flex:"1 1 260px", maxWidth:480, minWidth:0 }}>
             {[
               "I'm a logistics and EXIM professional with 5+ years of industrial experience, including 2.5+ years specializing in import-export operations within the EV manufacturing sector. Currently associated with Ola Electric Technologies via Transsafe Global Forwarding, I manage high-stakes, time-sensitive shipments for production-critical EV components.",
               "From ICEGATE filings and customs documentation to EPCG/IGCR compliance and reverse logistics, I thrive in dynamic, regulation-heavy environments — bridging CHA, freight forwarders, procurement, and warehouse teams with clarity and speed.",
@@ -333,8 +333,8 @@ function About() {
             ))}
           </motion.div>
 
-          <motion.div initial={{ opacity:0,x:28 }} animate={vis?{opacity:1,x:0}:{}} transition={{ duration:0.6, delay:0.24 }}
-            style={{ flex:"1 1 280px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+          <motion.div className="about-bento" initial={{ opacity:0,x:28 }} animate={vis?{opacity:1,x:0}:{}} transition={{ duration:0.6, delay:0.24 }}
+            style={{ flex:"1 1 260px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, minWidth:0 }}>
             {cards.map((c,i) => (
               <motion.div key={i} initial={{ opacity:0,y:14 }} animate={vis?{opacity:1,y:0}:{}} transition={{ delay:0.3+i*0.07 }}
                 whileHover={{ y:-4, boxShadow:"0 8px 24px rgba(30,58,95,0.12)" }}
@@ -451,7 +451,7 @@ function ExpCard({ exp, idx, vis }) {
 
       <div style={{ width:"100%", height:1, background:`${exp.accentBar}22`, marginBottom:7 }} />
 
-      <div style={{ flex:1, display:exp.wide?"grid":"flex", gridTemplateColumns:exp.wide?"1fr 1fr":undefined, flexDirection:exp.wide?undefined:"column", gap:exp.wide?5:3 }}>
+      <div className={exp.wide?"exp-wide-pts":""} style={{ flex:1, display:exp.wide?"grid":"flex", gridTemplateColumns:exp.wide?"1fr 1fr":undefined, flexDirection:exp.wide?undefined:"column", gap:exp.wide?5:3 }}>
         {exp.pts.map((pt,i) => (
           <div key={i} style={{ display:"flex", gap:6, alignItems:"flex-start" }}>
             <div style={{ width:3.5, height:3.5, minWidth:3.5, borderRadius:"50%", background:exp.dot, marginTop:5, flexShrink:0 }} />
@@ -467,8 +467,8 @@ function Experience() {
   const ref = useRef(null);
   const vis = useInView(ref, { once:true, margin:"-60px" });
   return (
-    <section id="experience" style={{ padding:"56px clamp(14px,4.5vw,72px)", background:`linear-gradient(180deg,${p.light} 0%,${p.white} 60%)` }}>
-      <div style={{ maxWidth:"min(75vw,1100px)", margin:"0 auto" }} ref={ref}>
+    <section id="experience" style={{ padding:"clamp(36px,5vw,56px) clamp(16px,5vw,56px)", background:`linear-gradient(180deg,${p.light} 0%,${p.white} 60%)` }}>
+      <div style={{ maxWidth:"min(75vw,1100px)", margin:"0 auto", width:"100%" }} ref={ref}>
         <motion.div initial={{ opacity:0,y:24 }} animate={vis?{opacity:1,y:0}:{}} transition={{ duration:0.5 }} style={{ marginBottom:28 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
             <div style={{ width:28, height:2.5, borderRadius:2, background:p.lime }} />
@@ -482,7 +482,7 @@ function Experience() {
         <div style={{ marginBottom:12 }}>
           <ExpCard exp={exps[0]} idx={0} vis={vis} />
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12 }}>
+        <div className="exp-sub-grid" style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
           {exps.slice(1).map((exp,i) => <ExpCard key={exp.num} exp={exp} idx={i+1} vis={vis} />)}
         </div>
       </div>
@@ -510,8 +510,8 @@ function Skills() {
   const ref = useRef(null);
   const vis = useInView(ref, { once:true, margin:"-60px" });
   return (
-    <section id="skills" style={{ padding:"56px clamp(14px,4vw,56px)", background:p.light }}>
-      <div style={{ maxWidth:"min(75vw,1100px)", margin:"0 auto" }} ref={ref}>
+    <section id="skills" style={{ padding:"clamp(36px,5vw,56px) clamp(16px,5vw,56px)", background:p.light }}>
+      <div style={{ maxWidth:"min(75vw,1100px)", margin:"0 auto", width:"100%" }} ref={ref}>
         <motion.div initial={{ opacity:0,y:28 }} animate={vis?{opacity:1,y:0}:{}} transition={{ duration:0.6 }} style={{ textAlign:"center", marginBottom:28 }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:8 }}>
             <div style={{ width:36, height:3, borderRadius:2, background:p.lime }} />
@@ -558,9 +558,9 @@ function Contact() {
     { icon:"globe",  label:"Global Logistics"},
   ];
   return (
-    <section id="contact" style={{ padding:"56px clamp(14px,4vw,56px) 40px", background:`linear-gradient(140deg,${p.midnight} 0%,${p.navy} 100%)`, position:"relative", overflow:"hidden" }}>
+    <section id="contact" style={{ padding:"clamp(36px,5vw,56px) clamp(16px,5vw,56px) 36px", background:`linear-gradient(140deg,${p.midnight} 0%,${p.navy} 100%)`, position:"relative", overflow:"hidden" }}>
       <div style={{ position:"absolute", bottom:-100, right:-100, width:340, height:340, borderRadius:"50%", background:`${p.lime}06`, pointerEvents:"none" }} />
-      <div style={{ maxWidth:"min(75vw,1100px)", margin:"0 auto" }} ref={ref}>
+      <div style={{ maxWidth:"min(75vw,1100px)", margin:"0 auto", width:"100%" }} ref={ref}>
         <motion.div initial={{ opacity:0,y:28 }} animate={vis?{opacity:1,y:0}:{}} transition={{ duration:0.6 }} style={{ textAlign:"center", marginBottom:32 }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:8 }}>
             <div style={{ width:36, height:3, borderRadius:2, background:p.lime }} />
@@ -573,7 +573,7 @@ function Contact() {
           </p>
         </motion.div>
 
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:14 }}>
+        <div className="contact-grid" style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:14 }}>
           {contacts.map((c,i) => (
             <motion.a key={i} href={c.href} target={c.href.startsWith("http")?"_blank":undefined} rel="noopener noreferrer"
               initial={{ opacity:0,y:22 }} animate={vis?{opacity:1,y:0}:{}} transition={{ delay:i*0.1 }}
@@ -589,7 +589,7 @@ function Contact() {
           ))}
         </div>
 
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))", gap:10 }}>
+        <div className="chips-grid" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10 }}>
           {chips.map((h,i) => (
             <motion.div key={i} initial={{ opacity:0,scale:0.88 }} animate={vis?{opacity:1,scale:1}:{}} transition={{ delay:0.4+i*0.07 }}
               style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:14, padding:"14px 12px", textAlign:"center", display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
@@ -607,7 +607,7 @@ function Contact() {
 function Footer() {
   return (
     <div style={{ background:p.midnight, borderTop:"1px solid rgba(200,232,74,0.08)", padding:"16px clamp(14px,4.5vw,72px)", textAlign:"center" }}>
-      <p style={{ fontFamily:"'Poppins',sans-serif", fontSize:11, color:"rgba(255,255,255,0.25)", margin:0 }}>© 2025 Ajith Kumar · Logistics & EXIM Professional · Bangalore, India</p>
+      <p style={{ fontFamily:"'Poppins',sans-serif", fontSize:11, color:"rgba(255,255,255,0.25)", margin:0 }}>© 2023 – {new Date().getFullYear()} Ajith Kumar · Logistics & EXIM Professional · Bangalore, India</p>
     </div>
   );
 }
@@ -627,30 +627,73 @@ function useActive() {
 /* ── APP ────────────────────────────────────────────────────────── */
 export default function App() {
   const active = useActive();
+
+  // Inject viewport meta — critical for real mobile rendering
+  useEffect(() => {
+    let meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "viewport";
+      document.head.appendChild(meta);
+    }
+    meta.content = "width=device-width, initial-scale=1, maximum-scale=1";
+  }, []);
+
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        html{scroll-behavior:smooth;font-size:13px;}
-        body{font-family:'Poppins',sans-serif;background:#fff;overflow-x:hidden;}
+        html{scroll-behavior:smooth;}
+        body{font-family:'Poppins',sans-serif;background:#fff;overflow-x:hidden;-webkit-text-size-adjust:100%;}
         ::-webkit-scrollbar{width:4px;}
         ::-webkit-scrollbar-track{background:#f1f1f1;}
         ::-webkit-scrollbar-thumb{background:#1E3A5F;border-radius:3px;}
         .desk-nav{display:flex!important;}
         .mob-nav{display:none!important;}
-        .inner{max-width:min(75vw,1100px);margin:0 auto;}
+        .inner{max-width:min(75vw,1100px);margin:0 auto;width:100%;}
+
+        /* Tablet ≤1024px */
+        @media(max-width:1024px){
+          .inner{max-width:90vw;}
+          .hero-grid{grid-template-columns:1fr!important;}
+          .hero-right{display:none!important;}
+          .hero-cards-mobile{display:grid!important;}
+          .about-grid{flex-direction:column!important;}
+          .skill-grid{grid-template-columns:repeat(3,1fr)!important;}
+          .exp-sub-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .exp-wide-pts{grid-template-columns:1fr 1fr!important;}
+          .contact-grid{grid-template-columns:repeat(3,1fr)!important;}
+        }
+
+        /* Mobile ≤768px */
         @media(max-width:768px){
           .desk-nav{display:none!important;}
           .mob-nav{display:flex!important;}
-          .inner{max-width:92vw;}
-        }
-        @media(max-width:960px){ .skill-grid{grid-template-columns:repeat(2,1fr)!important;} }
-        @media(max-width:700px){
+          .inner{max-width:94vw;}
+          .hero-grid{grid-template-columns:1fr!important;}
           .hero-right{display:none!important;}
           .hero-cards-mobile{display:grid!important;}
+          .about-grid{flex-direction:column!important;}
+          .about-bento{grid-template-columns:1fr 1fr!important;}
+          .skill-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .exp-sub-grid{grid-template-columns:1fr!important;}
+          .exp-wide-pts{grid-template-columns:1fr!important;}
+          .contact-grid{grid-template-columns:1fr!important;}
+          .chips-grid{grid-template-columns:1fr 1fr!important;}
         }
-        @media(max-width:480px){ .skill-grid{grid-template-columns:1fr!important;} }
+
+        /* Small mobile ≤480px */
+        @media(max-width:480px){
+          .inner{max-width:96vw;}
+          .skill-grid{grid-template-columns:1fr 1fr!important;}
+          .about-bento{grid-template-columns:1fr 1fr!important;}
+          .hero-cards-mobile{grid-template-columns:1fr 1fr!important;}
+          .contact-grid{grid-template-columns:1fr!important;}
+          .exp-sub-grid{grid-template-columns:1fr!important;}
+          .exp-wide-pts{grid-template-columns:1fr!important;}
+          .chips-grid{grid-template-columns:1fr 1fr!important;}
+        }
       `}</style>
       <Navbar active={active} />
       <main>
